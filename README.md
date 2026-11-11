@@ -1,17 +1,30 @@
 # lumen-iptv-downloads
 Public downloads of LUMEN IPTV for Android TV and Fire TV. Test builds; no provider credentials included.
 
-## Latest: LUMEN 1.0.195 beta (7 Nov 2026)
+## Latest: LUMEN 1.0.234 beta (11 Nov 2026)
 
-**Download:** https://github.com/sfxhewitt/lumen-iptv-downloads/raw/main/LUMEN.apk
+**Download:** https://raw.githubusercontent.com/sfxhewitt/lumen-iptv-downloads/main/LUMEN.apk
 
 This link always gets the newest build, so it never needs changing. Install it over your current LUMEN and your channels, favourites and settings are kept.
 
-- Package: com.portallive.tv, version 1.0.195
-- SHA-256: `422deebaa7e9b228ec20a1d0ed72f0e3cb27e3442ff708c4e0a94bde807565dd`
+- Package: com.portallive.tv, version 1.0.234
+- SHA-256: `0a872c985699686ca06255024591d7fe49b4a0552c7070f7ffb656fc73c4b937`
 - Signed with the same key as the earlier betas, so it updates in place.
 
-### What's new since 1.0.119
+### Install with the Downloader app (Fire TV / Android TV)
+1. Install **Downloader** by AFTVnews from your TV's app store.
+2. Fire TV only: Settings › My Fire TV › Developer options › Install unknown apps, and turn it on for Downloader. If Developer options is missing, go to Settings › My Fire TV › About and press OK on the device name 7 times.
+3. Open Downloader and type the address above in the box, then press Go.
+4. Choose **Install** when it asks. You can delete the downloaded file afterwards.
+
+### What's new since 1.0.195
+- **Smart Now.** A new screen in the menu that picks what's on right now worth watching: live sport, films, new episodes and more. It learns from what you watch, and leaves out SD channels.
+- **Add-ons.** Settings › Add-ons takes any add-on that uses the open Stremio add-on format. Their films and series show in the new Streamio screen. LUMEN comes with none, so only add ones you trust.
+- **Torrent streams, off by default.** If an add-on offers torrents, you can switch them on in Settings › Add-ons. LUMEN explains what that means first (your connection shares the file with others while it plays), and it stops sharing and deletes the files when you close the player.
+- **Snooker on TV.** The Snooker page and Home's "Snooker on TV" row show one best channel for each showing, never +1 or SD.
+- **Smoother menus.** Pressing Right from the menu goes straight into the screen, and Home and Smart Now reopen at the top.
+
+### Also new since 1.0.119
 - **Choose your Plex libraries.** Settings › Plex › Plex tab lists all your film and TV libraries. Pick which ones show on the Plex tab, and in what order.
 - **New film and series pages.** Titles in On Demand open a Netflix-style page with the trailer playing across the top.
 - **Tidier TV guide.** One row per channel, even when your provider lists it several times (HD, FHD or old names).
