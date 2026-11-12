@@ -68,7 +68,7 @@ jobs:
           if git diff --cached --quiet; then echo "version.json already up to date"; exit 0; fi
           git commit -m "version.json for LUMEN $(python3 -c 'import json; print(json.load(open("version.json"))["versionName"])')"
           for i in 1 2 3; do
-            git pull --rebase -q origin main && git push -q origin HEAD:main && exit 0
+            git pull --rebase -q origin "$GITHUB_REF_NAME" && git push -q origin "HEAD:$GITHUB_REF_NAME" && exit 0
             sleep 5
           done
           exit 1
