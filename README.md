@@ -1,14 +1,14 @@
 # lumen-iptv-downloads
 Public downloads of LUMEN IPTV for Android TV and Fire TV. Test builds; no provider credentials included.
 
-## Latest: LUMEN 1.0.242 beta (12 Nov 2026)
+## Latest: LUMEN 1.0.245 beta (12 Nov 2026)
 
 **Download:** https://raw.githubusercontent.com/sfxhewitt/lumen-iptv-downloads/main/LUMEN.apk
 
 This link always gets the newest build, so it never needs changing. Install it over your current LUMEN and your channels, favourites and settings are kept.
 
-- Package: com.portallive.tv, version 1.0.242
-- SHA-256: `8010abbd55aee62cd08f119f369a4c59410e1b5c9dd9199fe08887f7cd17d0cd`
+- Package: com.portallive.tv, version 1.0.245
+- SHA-256: `687b0ca56eb290cdce24f4ecee53a483faa478209543c9174411b0787b5699f8`
 - Signed with the same key as the earlier betas, so it updates in place.
 
 ### Install with the Downloader app (Fire TV / Android TV)
@@ -19,6 +19,7 @@ This link always gets the newest build, so it never needs changing. Install it o
 
 ### What's new since 1.0.239
 - **Smart Now starts at the beginning.** Pressing Right from the menu lands on the top pick, and pressing Down goes to the first item of each row, never part-way along it.
+- **Smart Now keeps your place.** When Smart Now refreshes its picks while you're browsing, the row you're in stays put, so the next press doesn't jump you back to the menu.
 
 ### Also new since 1.0.234
 - **Updates in the app.** Install this build the usual way once, and after that you won't need Downloader again: each time you open LUMEN it checks this page, and when there's a newer build it downloads it straight away and your TV asks you to press **Install**. Your channels, favourites and settings are kept. If you're recording, LUMEN asks first. You can also check in Settings › About › Updates.
