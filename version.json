@@ -1,10 +1,10 @@
 {
-  "versionCode": 239,
-  "versionName": "1.0.239",
-  "url": "https://raw.githubusercontent.com/sfxhewitt/lumen-iptv-downloads/7d9600825731489519da7bc62da49f96393494bd/LUMEN.apk",
-  "size": 15752174,
-  "sha256": "fe916d8fc46a7e49ab22c70e405a8bd4fe14811f49db2c755e269c18eb59f88d",
+  "versionCode": 242,
+  "versionName": "1.0.242",
+  "url": "https://raw.githubusercontent.com/sfxhewitt/lumen-iptv-downloads/695cbd08fd1c63a1abdf2b6ce4819e68c478244e/LUMEN.apk",
+  "size": 15753358,
+  "sha256": "8010abbd55aee62cd08f119f369a4c59410e1b5c9dd9199fe08887f7cd17d0cd",
   "notes": [
-    "Updates in the app"
+    "Smart Now starts at the beginning"
   ]
 }
