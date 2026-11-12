@@ -1,0 +1,74 @@
+name: Update version.json
+
+# LUMEN reads version.json (beside LUMEN.apk) to offer updates inside the app. This keeps it
+# matching LUMEN.apk: whenever LUMEN.apk or the README changes on main, it reads the APK's own
+# version, size and SHA-256 and writes version.json, pointing at this exact commit's copy of the
+# APK so the file and its hash can never disagree. "What's new" headlines come from the README's
+# Latest section, only when that section is about this version.
+on:
+  push:
+    branches: [main]
+    paths: [LUMEN.apk, README.md]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: version-json
+  cancel-in-progress: false
+
+jobs:
+  version:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Write version.json
+        run: |
+          set -euo pipefail
+          AAPT2="$(ls -d "$ANDROID_HOME"/build-tools/*/ | sort -V | tail -1)aapt2"
+          BADGING="$("$AAPT2" dump badging LUMEN.apk | head -1)"
+          echo "$BADGING"
+          export PACKAGE="$(echo "$BADGING" | grep -o "^package: name='[^']*'" | cut -d"'" -f2)"
+          export CODE="$(echo "$BADGING" | grep -o " versionCode='[^']*'" | cut -d"'" -f2)"
+          export NAME="$(echo "$BADGING" | grep -o " versionName='[^']*'" | cut -d"'" -f2)"
+          export URL="https://raw.githubusercontent.com/${GITHUB_REPOSITORY}/${GITHUB_SHA}/LUMEN.apk"
+          [ "$PACKAGE" = "com.portallive.tv" ] || { echo "::error::LUMEN.apk is $PACKAGE, not LUMEN"; exit 1; }
+          python3 - <<'PY'
+          import hashlib, json, os, re
+          apk = open("LUMEN.apk", "rb").read()
+          name = os.environ["NAME"]
+          readme = open("README.md", encoding="utf-8").read()
+          notes = []
+          latest = re.search(r"^## Latest: LUMEN (\S+)", readme, re.M)
+          if latest and latest.group(1) == name:
+              section = re.search(r"^### What's new[^\n]*\n(.*?)(?=^#|\Z)", readme, re.M | re.S)
+              if section:
+                  notes = re.findall(r"^- \*\*(.+?)\.?\*\*", section.group(1), re.M)[:6]
+          manifest = {
+              "versionCode": int(os.environ["CODE"]),
+              "versionName": name,
+              "url": os.environ["URL"],
+              "size": len(apk),
+              "sha256": hashlib.sha256(apk).hexdigest(),
+              "notes": notes,
+          }
+          with open("version.json", "w", encoding="utf-8") as f:
+              json.dump(manifest, f, indent=2, ensure_ascii=False)
+              f.write("\n")
+          print(json.dumps(manifest, indent=2))
+          PY
+
+      - name: Commit it
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add version.json
+          if git diff --cached --quiet; then echo "version.json already up to date"; exit 0; fi
+          git commit -m "version.json for LUMEN $(python3 -c 'import json; print(json.load(open("version.json"))["versionName"])')"
+          for i in 1 2 3; do
+            git pull --rebase -q origin main && git push -q origin HEAD:main && exit 0
+            sleep 5
+          done
+          exit 1
