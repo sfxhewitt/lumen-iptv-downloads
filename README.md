@@ -1,14 +1,14 @@
 # lumen-iptv-downloads
 Public downloads of LUMEN IPTV for Android TV and Fire TV. Test builds; no provider credentials included.
 
-## Latest: LUMEN 1.0.234 beta (11 Nov 2026)
+## Latest: LUMEN 1.0.239 beta (12 Nov 2026)
 
 **Download:** https://raw.githubusercontent.com/sfxhewitt/lumen-iptv-downloads/main/LUMEN.apk
 
 This link always gets the newest build, so it never needs changing. Install it over your current LUMEN and your channels, favourites and settings are kept.
 
-- Package: com.portallive.tv, version 1.0.234
-- SHA-256: `0a872c985699686ca06255024591d7fe49b4a0552c7070f7ffb656fc73c4b937`
+- Package: com.portallive.tv, version 1.0.239
+- SHA-256: `fe916d8fc46a7e49ab22c70e405a8bd4fe14811f49db2c755e269c18eb59f88d`
 - Signed with the same key as the earlier betas, so it updates in place.
 
 ### Install with the Downloader app (Fire TV / Android TV)
@@ -17,7 +17,11 @@ This link always gets the newest build, so it never needs changing. Install it o
 3. Open Downloader and type the address above in the box, then press Go.
 4. Choose **Install** when it asks. You can delete the downloaded file afterwards.
 
-### What's new since 1.0.195
+### What's new since 1.0.234
+- **Updates in the app.** Install this build the usual way once, and after that you won't need Downloader again: each time you open LUMEN it checks this page, and when there's a newer build it downloads it straight away and your TV asks you to press **Install**. Your channels, favourites and settings are kept. If you're recording, LUMEN asks first. You can also check in Settings › About › Updates.
+  - The first time, your TV may ask you to let LUMEN install apps. On Fire TV that's Settings › My Fire TV › Developer options › Install unknown apps › LUMEN. On Android TV it's Settings › Apps › Security & restrictions › Unknown sources › LUMEN (or Settings › Apps › Special app access › Install unknown apps). LUMEN shows you the way and carries on when you come back.
+
+### Also new since 1.0.195
 - **Smart Now.** A new screen in the menu that picks what's on right now worth watching: live sport, films, new episodes and more. It learns from what you watch, and leaves out SD channels.
 - **Add-ons.** Settings › Add-ons takes any add-on that uses the open Stremio add-on format. Their films and series show in the new Streamio screen. LUMEN comes with none, so only add ones you trust.
 - **Torrent streams, off by default.** If an add-on offers torrents, you can switch them on in Settings › Add-ons. LUMEN explains what that means first (your connection shares the file with others while it plays), and it stops sharing and deletes the files when you close the player.
