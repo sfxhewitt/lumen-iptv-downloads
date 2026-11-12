@@ -1,14 +1,10 @@
 {
-  "versionCode": 234,
-  "versionName": "1.0.234",
-  "url": "https://raw.githubusercontent.com/sfxhewitt/lumen-iptv-downloads/999a3658042c1c7bb081626e91cbbd64f67b4dc7/LUMEN.apk",
-  "size": 15740802,
-  "sha256": "0a872c985699686ca06255024591d7fe49b4a0552c7070f7ffb656fc73c4b937",
+  "versionCode": 239,
+  "versionName": "1.0.239",
+  "url": "https://raw.githubusercontent.com/sfxhewitt/lumen-iptv-downloads/7d9600825731489519da7bc62da49f96393494bd/LUMEN.apk",
+  "size": 15752174,
+  "sha256": "fe916d8fc46a7e49ab22c70e405a8bd4fe14811f49db2c755e269c18eb59f88d",
   "notes": [
-    "Smart Now",
-    "Add-ons",
-    "Torrent streams, off by default",
-    "Snooker on TV",
-    "Smoother menus"
+    "Updates in the app"
   ]
 }
