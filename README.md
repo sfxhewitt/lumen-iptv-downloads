@@ -14,7 +14,7 @@ This link always gets the newest build, so it never needs changing. Install it o
 ### Install with the Downloader app (Fire TV / Android TV)
 1. Install **Downloader** by AFTVnews from your TV's app store.
 2. Fire TV only: Settings › My Fire TV › Developer options › Install unknown apps, and turn it on for Downloader. If Developer options is missing, go to Settings › My Fire TV › About and press OK on the device name 7 times.
-3. Open Downloader and type the address above in the box, then press Go.
+3. Open Downloader, type **is.gd/lumeniptv** in the box (a short link to the address above), then press Go.
 4. Choose **Install** when it asks. You can delete the downloaded file afterwards.
 
 ### What's new since 1.0.239
