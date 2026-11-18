@@ -49,7 +49,7 @@ This link always gets the newest build, so it never needs changing. Install it o
 ## LUMEN Home
 LUMEN's companion home screen (a launcher for Android TV and Fire TV): **https://raw.githubusercontent.com/sfxhewitt/lumen-iptv-downloads/main/LUMEN-Home.apk**
 
-It updates itself the same way as LUMEN: when Home comes to the front it checks `home-version.json` here (at most every 15 minutes), downloads a newer build quietly, and your TV asks you to press **Install**. Allow it once in Install unknown apps, as for LUMEN.
+It updates itself the same way as LUMEN: when Home comes to the front it checks `home-version.json` here (at most every 15 minutes), downloads a newer build quietly, and your TV asks you to press **Install**. Allow it once in Install unknown apps, as for LUMEN. Home's Settings › Updates turns automatic updates off, or checks straight away with Check now.
 
 ## Older builds
 See [Releases](https://github.com/sfxhewitt/lumen-iptv-downloads/releases) for 1.0.119 and 1.0.88.
