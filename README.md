@@ -1,14 +1,14 @@
 # lumen-iptv-downloads
 Public downloads of LUMEN IPTV for Android TV and Fire TV. Test builds; no provider credentials included.
 
-## Latest: LUMEN 1.0.245 beta (12 Nov 2026)
+## Latest: LUMEN 1.0.303 beta (21 Nov 2026)
 
 **Download:** https://raw.githubusercontent.com/sfxhewitt/lumen-iptv-downloads/main/LUMEN.apk
 
 This link always gets the newest build, so it never needs changing. Install it over your current LUMEN and your channels, favourites and settings are kept.
 
-- Package: com.portallive.tv, version 1.0.245
-- SHA-256: `687b0ca56eb290cdce24f4ecee53a483faa478209543c9174411b0787b5699f8`
+- Package: com.portallive.tv, version 1.0.303
+- SHA-256: `a4f9e6162e7d0efd72bab29805f82858a7f11655085e9b1d78508968c0bfbff6`
 - Signed with the same key as the earlier betas, so it updates in place.
 
 ### Install with the Downloader app (Fire TV / Android TV)
@@ -17,7 +17,14 @@ This link always gets the newest build, so it never needs changing. Install it o
 3. Open Downloader, type **is.gd/lumeniptv** in the box (a short link to the address above), then press Go.
 4. Choose **Install** when it asks. You can delete the downloaded file afterwards.
 
-### What's new since 1.0.239
+### What's new since 1.0.245
+- **The guide opens at the current time.** The TV Guide always opens at now and keeps up with the clock until you move along it, so you never need to press Now first.
+- **5.1 sound in Bluetooth headphones.** Channels with 5.1 sound used to be silent in Bluetooth headphones. While headphones are connected, LUMEN now mixes them down to stereo. HDMI still gets Dolby as before.
+- **Steadier sound on live channels.** When a stream drops and reconnects, the sound carries on in one piece instead of blipping, and LUMEN gives a slow stream longer before reconnecting.
+- **Live matches on LUMEN Home.** When snooker or a UFC fight is on, LUMEN Home can show the live score with a muted picture from the channel showing it. The picture needs two free streams on your provider.
+- **Kids' picks for LUMEN Home.** With LUMEN Home's Kids mode on, LUMEN shares films and shows rated 12 or under and the children's channels on now. Adult, locked and hidden channels never show there.
+
+### Also new since 1.0.239
 - **Smart Now starts at the beginning.** Pressing Right from the menu lands on the top pick, and pressing Down goes to the first item of each row, never part-way along it.
 - **Smart Now keeps your place.** When Smart Now refreshes its picks while you're browsing, the row you're in stays put, so the next press doesn't jump you back to the menu.
 
