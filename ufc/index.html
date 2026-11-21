@@ -30,6 +30,10 @@
 html{-webkit-text-size-adjust:100%;background:var(--bg);touch-action:pan-x pan-y}
 /* No zooming: double-tap and pinch are both off, so the page always stays fully zoomed out. */
 button,a,.chip{touch-action:manipulation}
+/* No text selection or long-press menus (taps on the TV delay chip were selecting text); typing boxes still work. */
+html{-webkit-user-select:none;user-select:none;-webkit-touch-callout:none}
+input,textarea{-webkit-user-select:text;user-select:text;-webkit-touch-callout:default}
+img{-webkit-user-drag:none}
 body{margin:0;background:var(--bg);color:var(--fg);font:15px/1.45 var(--body);padding-bottom:calc(28px + env(safe-area-inset-bottom,0px));-webkit-tap-highlight-color:transparent}
 button{font:inherit;color:inherit}
 .wrap{max-width:560px;margin:0 auto;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
