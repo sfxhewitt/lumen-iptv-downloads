@@ -9,16 +9,18 @@ It reads ESPN's fight centre (the card, results, live stats) and UFC.com's fight
 (walkouts, knockdowns and the result a little sooner), the same feeds as the Cageside page.
 It stays quiet about anything already over when it starts, and stops once the card is finished.
 """
+import base64
 import json
 import os
 import re
 import sys
 import time
 import unicodedata
+import urllib.error
 import urllib.request
 from datetime import datetime, timezone
 
-TOPIC = os.environ.get("CAGESIDE_TOPIC", "cageside-ufc-7rk2")
+TOPIC = os.environ.get("CAGESIDE_TOPIC", "cageside-ufc-7rk2")  # empty: no ntfy
 STATE_FILE = os.environ.get("CAGESIDE_STATE", "cageside-alerts-state.json")
 MAX_HOURS = float(os.environ.get("CAGESIDE_MAX_HOURS", "8"))
 # Leave straight away when nothing is on and the first fight is further off than this.
@@ -46,7 +48,140 @@ def get(url, timeout=12):
         return json.load(r)
 
 
+# ---------- Web Push straight to Cageside on the phone (needs the private key; ntfy works without it) ----------
+VAPID_KEY = os.environ.get("CAGESIDE_VAPID_KEY", "")
+SUBS_TOPIC = os.environ.get("CAGESIDE_SUBS_TOPIC", "cageside-subs-q8m3vz")
+SUBS_FILE = os.environ.get("CAGESIDE_SUBS", "cageside-subs.json")
+
+
+def b64u(b):
+    return base64.urlsafe_b64encode(b).rstrip(b"=").decode()
+
+
+def unb64u(s):
+    return base64.urlsafe_b64decode(s + "=" * (-len(s) % 4))
+
+
+class Pusher:
+    """Encrypted Web Push (RFC 8291 aes128gcm, VAPID RFC 8292) to every phone that turned alerts on."""
+
+    def __init__(self, pem_path):
+        from cryptography.hazmat.primitives import serialization
+        with open(pem_path, "rb") as fh:
+            self.key = serialization.load_pem_private_key(fh.read(), None)
+        self.pub = self.key.public_key().public_bytes(serialization.Encoding.X962, serialization.PublicFormat.UncompressedPoint)
+        try:
+            with open(SUBS_FILE) as fh:
+                self.subs = json.load(fh)
+        except Exception:
+            self.subs = {}
+        self.since = "all"
+        self.next_intake = 0
+        self.tokens = {}
+
+    def save(self):
+        with open(SUBS_FILE, "w") as fh:
+            json.dump(self.subs, fh)
+
+    def token(self, aud):
+        from cryptography.hazmat.primitives import hashes
+        from cryptography.hazmat.primitives.asymmetric import ec
+        from cryptography.hazmat.primitives.asymmetric.utils import decode_dss_signature
+        tok = self.tokens.get(aud)
+        if tok and tok[1] - time.time() > 3600:
+            return tok[0]
+        exp = int(time.time()) + 12 * 3600
+        head = b64u(json.dumps({"typ": "JWT", "alg": "ES256"}).encode())
+        claims = b64u(json.dumps({"aud": aud, "exp": exp, "sub": "https://raw.githack.com/sfxhewitt/lumen-iptv-downloads/main/ufc/"}).encode())
+        r, s_ = decode_dss_signature(self.key.sign(f"{head}.{claims}".encode(), ec.ECDSA(hashes.SHA256())))
+        jwt = f"{head}.{claims}.{b64u(r.to_bytes(32, 'big') + s_.to_bytes(32, 'big'))}"
+        self.tokens[aud] = (jwt, exp)
+        return jwt
+
+    @staticmethod
+    def encrypt(sub, payload):
+        from cryptography.hazmat.primitives import hashes, serialization
+        from cryptography.hazmat.primitives.asymmetric import ec
+        from cryptography.hazmat.primitives.ciphers.aead import AESGCM
+        from cryptography.hazmat.primitives.kdf.hkdf import HKDF
+
+        def hkdf(salt, ikm, info, n):
+            return HKDF(algorithm=hashes.SHA256(), length=n, salt=salt, info=info).derive(ikm)
+        ua_pub = unb64u(sub["keys"]["p256dh"])
+        auth = unb64u(sub["keys"]["auth"])
+        eph = ec.generate_private_key(ec.SECP256R1())
+        eph_pub = eph.public_key().public_bytes(serialization.Encoding.X962, serialization.PublicFormat.UncompressedPoint)
+        shared = eph.exchange(ec.ECDH(), ec.EllipticCurvePublicKey.from_encoded_point(ec.SECP256R1(), ua_pub))
+        ikm = hkdf(auth, shared, b"WebPush: info\x00" + ua_pub + eph_pub, 32)
+        salt = os.urandom(16)
+        cek = hkdf(salt, ikm, b"Content-Encoding: aes128gcm\x00", 16)
+        nonce = hkdf(salt, ikm, b"Content-Encoding: nonce\x00", 12)
+        ct = AESGCM(cek).encrypt(nonce, payload + b"\x02", None)
+        return salt + (4096).to_bytes(4, "big") + bytes([len(eph_pub)]) + eph_pub + ct
+
+    def send(self, sub, data):
+        from urllib.parse import urlsplit
+        u = urlsplit(sub["endpoint"])
+        req = urllib.request.Request(sub["endpoint"], data=self.encrypt(sub, json.dumps(data).encode()), method="POST", headers={
+            "TTL": "3600", "Urgency": "high", "Content-Encoding": "aes128gcm", "Content-Type": "application/octet-stream",
+            "Authorization": f"vapid t={self.token(f'{u.scheme}://{u.netloc}')}, k={b64u(self.pub)}"})
+        try:
+            with urllib.request.urlopen(req, timeout=15) as r:
+                return r.status
+        except urllib.error.HTTPError as e:
+            log("push refused", e.code, e.read()[:200])
+            return e.code
+        except Exception as e:
+            log("push failed", e)
+            return 0
+
+    def push(self, title, message, tag=""):
+        ok = not self.subs
+        for ep, sub in list(self.subs.items()):
+            st = self.send(sub, {"title": title, "body": message, "tag": tag, "url": "./index.html"})
+            if st in (404, 410):
+                log("subscription gone, dropping")
+                self.subs.pop(ep, None)
+                self.save()
+            ok = ok or 200 <= st < 300
+        return ok
+
+    def intake(self):
+        """New phones leave their subscription in the ntfy mailbox; a test alert confirms each one."""
+        if time.time() < self.next_intake:
+            return
+        self.next_intake = time.time() + 20
+        try:
+            req = urllib.request.Request(f"https://ntfy.sh/{SUBS_TOPIC}/json?poll=1&since={self.since}", headers={"User-Agent": "Cageside alerts"})
+            with urllib.request.urlopen(req, timeout=15) as r:
+                lines = r.read().decode().splitlines()
+        except Exception as e:
+            log("mailbox read failed", e)
+            return
+        for line in lines:
+            try:
+                m = json.loads(line)
+                self.since = m.get("id") or self.since
+                sub = json.loads(m.get("message") or "{}").get("sub") or {}
+            except ValueError:
+                continue
+            ep = sub.get("endpoint")
+            if not ep or not (sub.get("keys") or {}).get("p256dh") or ep in self.subs:
+                continue
+            self.subs[ep] = sub
+            self.save()
+            log("new phone:", ep[:60])
+            st = self.send(sub, {"title": "Cageside alerts are on", "body": "You'll get fight starts, knockdowns and results while the card is on.", "tag": "welcome"})
+            log("test alert", st)
+
+
+PUSHER = None
+
+
 def notify(title, message, tags=(), priority=3):
+    pushed = PUSHER.push(title, message, re.sub(r"\W+", "-", title.lower())[:40]) if PUSHER else True
+    if not TOPIC:
+        return pushed
     body = {"topic": TOPIC, "title": title, "message": message, "tags": list(tags), "priority": priority, "click": APP}
     req = urllib.request.Request("https://ntfy.sh/", data=json.dumps(body).encode(), headers={"Content-Type": "application/json"})
     for attempt in range(5):
@@ -234,7 +369,11 @@ def save_state(st):
 
 
 def main():
+    global PUSHER
     began = time.time()
+    if VAPID_KEY:
+        PUSHER = Pusher(VAPID_KEY)
+        log("web push on,", len(PUSHER.subs), "phone(s)")
     sb = get(ESPN_SB)
     ev = (sb.get("events") or [{}])[0]
     eid = str(ev.get("id") or "")
@@ -268,6 +407,8 @@ def main():
                 ufs = ufs if ufc_bad < 6 else []
             ufc_next = time.time() + (10 if ufc_bad < 3 else 30)
 
+        if PUSHER:
+            PUSHER.intake()
         name = fc.get("event", {}).get("name") or ev.get("name") or "UFC"
         now_ms = time.time() * 1000
         out = []  # (key, title, message, tags, priority)
