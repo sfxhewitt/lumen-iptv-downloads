@@ -165,6 +165,16 @@ section{margin-top:22px}
 .tape a{color:var(--muted);font-size:12.5px}
 .seghead{padding:10px 14px;background:var(--panel2);display:flex;justify-content:space-between;font:700 14px/1 var(--display);letter-spacing:.12em;text-transform:uppercase;color:var(--muted)}
 .seghead span{font-family:var(--body);letter-spacing:0;text-transform:none;font-weight:500;font-size:12.5px}
+.sync{margin-top:12px;background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:12px 14px}
+.synchead{display:flex;justify-content:space-between;align-items:center;gap:10px}
+.synchint{font-size:12.5px;color:var(--muted);margin-top:6px;line-height:1.4}
+.syncshow{font:700 44px/1 var(--display);text-align:center;margin:12px 0 10px;letter-spacing:.04em}
+.pad,.nudge{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.nudge{margin-top:8px}
+.key{font:600 22px/1 var(--body);padding:13px 0;border-radius:12px;border:1px solid var(--line);background:var(--panel2);color:var(--fg);cursor:pointer;touch-action:manipulation}
+.key:active{filter:brightness(1.35)}
+.key.alt{font-size:15px;color:var(--muted)}
+.key.ok{background:var(--red);border-color:var(--red);color:#fff}
 .note{margin-top:10px;font-size:13px;color:var(--gold);line-height:1.4}
 .err{margin-top:14px;padding:12px 14px;border-radius:12px;border:1px solid rgba(242,184,75,.4);background:rgba(242,184,75,.08);color:var(--gold);font-size:13.5px}
 #tvSec{scroll-margin-top:72px}
@@ -233,7 +243,7 @@ const ROUND_MS = 300000;
 /* Push alerts: the sender's public key, and the mailbox the phone leaves its subscription in. */
 const VAPID_PUBLIC = 'BO5CqyagCNZSaw_W55Fn2EsqMWnLWONFTK1apDc0RQCOgf9x_gxXBP_uOx3Jw0z30tV331KUKcvB00nXtFGLRh0';
 const SUB_TOPIC = 'cageside-subs-q8m3vz';
-const DELAYS = [0, 15, 30, 45, 60, 90];
+const MAX_DELAY = 600; // seconds the phone can be held back to match a TV stream
 
 const S = {
   sb: null, sbAt: 0,
@@ -243,6 +253,7 @@ const S = {
   ufcId: null, scanAt: 0, ufcFails: 0,
   open: new Set(), errors: {}, lastOk: 0,
   delay: 0, wake: null, wakeOn: false,
+  sync: { open: false, digits: '', msg: '' }, syncNote: null,
 };
 
 const $ = s => document.querySelector(s);
@@ -284,7 +295,7 @@ async function getJSON(url, ms = 8000) {
 /* ---------- TV delay: show what was true N seconds ago, so the phone doesn't spoil the TV ---------- */
 function push(arr, data) {
   arr.push({ at: now(), data });
-  const keep = now() - (S.delay * 1000 + 120000);
+  const keep = now() - (Math.max(S.delay, 180) * 1000 + 120000);
   while (arr.length > 2 && arr[1].at < keep) arr.shift();
 }
 function pick(arr) {
@@ -603,6 +614,22 @@ function renderResults(m) {
   return `<div class="h2"><h2>Results so far</h2><span>${m.done.length} of ${m.fights.length}</span></div><div class="list">${rows.map(r => `<div class="row">${r}</div>`).join('')}</div>`;
 }
 
+/* Sizes the British way: height in feet and inches, reach in inches, weight in stone and pounds. */
+function inches(x) {
+  const t = String(x || '');
+  let m = t.match(/([\d.]+)\s*cm/i); if (m) return Math.round(+m[1] / 2.54);
+  m = t.match(/([\d.]+)\s*m\b/i); if (m) return Math.round(+m[1] / 0.0254);
+  m = t.match(/(\d+)\s*(?:'|ft)\s*(\d+(?:\.\d+)?)?/i); if (m) return Math.round(+m[1] * 12 + (+m[2] || 0));
+  m = t.match(/([\d.]+)\s*(?:"|in)/i); if (m) return Math.round(+m[1]);
+  return null;
+}
+const feetIn = x => { const n = inches(x); return n ? `${Math.floor(n / 12)}ft ${n % 12}in` : (x || ''); };
+const reachIn = x => { const n = inches(x); return n ? `${n}in` : (x || ''); };
+const stLb = x => {
+  const lb = parseFloat(x); if (!(lb > 0)) return '';
+  const st = Math.floor(lb / 14), rest = Math.round((lb - st * 14) * 10) / 10;
+  return `${st}st ${rest}lb`;
+};
 function tape(f) {
   const r = f.red, b = f.blue;
   const ur = f.u ? (f.flip ? f.u.blue : f.u.red) : null, ub = f.u ? (f.flip ? f.u.red : f.u.blue) : null;
@@ -613,11 +640,11 @@ function tape(f) {
   if (nick(ur) || nick(ub)) h += row(nick(ur) || '–', 'Nickname', nick(ub) || '–');
   h += row(v(r.rec), 'Record', v(b.rec));
   h += row(v(r.age), 'Age', v(b.age));
-  h += row(v(r.height), 'Height', v(b.height));
-  h += row(v(r.reach), 'Reach', v(b.reach));
+  h += row(v(feetIn(r.height)), 'Height', v(feetIn(b.height)));
+  h += row(v(reachIn(r.reach)), 'Reach', v(reachIn(b.reach)));
   h += row(v(r.stance), 'Stance', v(b.stance));
   h += row(v(r.country), 'From', v(b.country));
-  if (ur && ub && (ur.WeighIn || ub.WeighIn)) h += row(ur.WeighIn ? `${ur.WeighIn} lb` : '–', 'Weigh-in', ub.WeighIn ? `${ub.WeighIn} lb` : '–');
+  if (ur && ub && (ur.WeighIn || ub.WeighIn)) h += row(v(stLb(ur.WeighIn)), 'Weigh-in', v(stLb(ub.WeighIn)));
   const cr = r.st, cb = b.st;
   if (cr.strikeLPM || cb.strikeLPM) {
     h += `</table><div class="sub">UFC career averages</div><table>`;
@@ -679,12 +706,14 @@ function renderEvent(m) {
   return `<div class="eyebrow">${esc(label)} · ${esc(fmtDay(m.first))}${place ? ' · ' + esc(place) : ''}</div>
   <h1>${esc(title)}</h1>
   <div class="chips">${status}
-    <button type="button" class="chip" id="delayBtn" aria-pressed="${S.delay > 0}" title="Hold the live data back to match your TV stream">${delay}</button>
+    <button type="button" class="chip" id="delayBtn" aria-pressed="${S.delay > 0}" title="Sync with your TV">${delay}</button>
     ${'wakeLock' in navigator ? `<button type="button" class="chip" id="wakeBtn" aria-pressed="${S.wakeOn}">${S.wakeOn ? 'Screen stays on' : 'Keep screen on'}</button>` : ''}
     <button type="button" class="chip" id="tvBtn" aria-pressed="${TV.open}">${TV.open ? 'Hide player' : 'Watch'}</button>
     <button type="button" class="chip" id="alertBtn" aria-pressed="${S.alerts === 'on'}">${S.alerts === 'on' ? 'Alerts on' : 'Turn on alerts'}</button>
   </div>
   ${S.alertMsg ? `<div class="note">${esc(S.alertMsg)}</div>` : ''}
+  ${S.syncNote ? `<div class="note">${esc(S.syncNote.text)}</div>` : ''}
+  ${S.sync.open ? syncPanel() : ''}
   <div class="watch"><span class="tv">TNT Sports</span><span class="times">UK · ${segs}</span></div>`;
 }
 
@@ -733,6 +762,7 @@ function tick() {
   }
   document.querySelectorAll('[data-until]').forEach(el => { el.textContent = untilText(+el.dataset.until); });
   renderFresh();
+  if (S.syncNote && S.syncNote.until < now()) { S.syncNote = null; render(); }
   if (S.delay) render();
 }
 
@@ -833,11 +863,9 @@ document.addEventListener('click', async e => {
   const row = e.target.closest('button[data-key]');
   if (row) { const k = row.dataset.key; S.open.has(k) ? S.open.delete(k) : S.open.add(k); render(); return; }
   if (e.target.closest('#fresh')) { due.fc = 0; due.ufc = 0; due.st = 0; schedule(true); return; }
-  if (e.target.closest('#delayBtn')) {
-    const i = DELAYS.indexOf(S.delay);
-    S.delay = DELAYS[(i + 1) % DELAYS.length];
-    lsSet('delay', S.delay); render(); return;
-  }
+  if (e.target.closest('#delayBtn')) { S.sync = { open: !S.sync.open, digits: '', msg: '' }; render(); return; }
+  const key = e.target.closest('button[data-pad]');
+  if (key) { padKey(key.dataset.pad); return; }
   if (e.target.closest('#alertBtn')) { turnOnAlerts(); return; }
   if (e.target.closest('#tvBtn')) { tvToggle(); return; }
   const ch = e.target.closest('button[data-ch]');
@@ -911,6 +939,75 @@ async function bootAlerts() {
     // Leave the subscription in the mailbox again now and then, so a restarted sender still has it.
     if (now() - (+lsGet('subPostedAt') || 0) > 6 * 3600e3) await sendSub(sub);
   } catch (x) { /* alerts stay as they were */ }
+}
+
+/* ---------- Sync with the TV: type the round clock the TV shows, and the delay is worked out ---------- */
+const clampDelay = d => Math.max(0, Math.min(MAX_DELAY, Math.round(+d || 0)));
+function setDelay(d, note) {
+  S.delay = clampDelay(d); lsSet('delay', S.delay);
+  if (note) S.syncNote = { text: note, until: now() + 8000 };
+  render();
+}
+function syncPanel() {
+  const d = S.sync.digits.padStart(3, '0');
+  const shown = S.sync.digits ? `${+d.slice(0, -2)}:${d.slice(-2)}` : '–:––';
+  const key = (k, label, cls = '') => `<button type="button" class="key${cls}" data-pad="${k}">${label}</button>`;
+  return `<div class="sync">
+    <div class="synchead"><b>Sync with your TV</b><button type="button" class="linkbtn" data-pad="close">Close</button></div>
+    <div class="synchint">Type the round clock your TV is showing, then tap OK. For a perfect match, type a time just coming up (a few seconds lower) and tap OK as the TV clock hits it.</div>
+    <div class="syncshow num">${shown}</div>
+    <div class="pad">${[1, 2, 3, 4, 5, 6, 7, 8, 9].map(n => key(n, n)).join('')}${key('del', '⌫', ' alt')}${key(0, 0)}${key('ok', 'OK', ' ok')}</div>
+    <div class="nudge">${key('minus', '−5s', ' alt')}${key('off', 'Off', ' alt')}${key('plus', '+5s', ' alt')}</div>
+    <div class="synchint">Now ${S.delay ? `${S.delay}s behind live` : 'live, no delay'}.</div>
+    ${S.sync.msg ? `<div class="note">${esc(S.sync.msg)}</div>` : ''}
+  </div>`;
+}
+function padKey(k) {
+  const sy = S.sync;
+  sy.msg = '';
+  if (/^\d$/.test(k)) { if (sy.digits.length < 3) sy.digits = (sy.digits + k).replace(/^0+(?=\d)/, ''); }
+  else if (k === 'del') sy.digits = sy.digits.slice(0, -1);
+  else if (k === 'close') sy.open = false;
+  else if (k === 'off') setDelay(0, 'TV delay off: showing live.');
+  else if (k === 'minus' || k === 'plus') setDelay(S.delay + (k === 'plus' ? 5 : -5));
+  else if (k === 'ok') {
+    const d = sy.digits.padStart(3, '0'), mins = +d.slice(0, -2), secs = +d.slice(-2);
+    if (!sy.digits) sy.msg = 'Type the time on the TV clock first.';
+    else if (secs > 59 || mins * 60 + secs > 300) sy.msg = 'Rounds are 5 minutes, so that time can\'t be on the clock.';
+    else {
+      const r = syncToTv(mins * 60 + secs);
+      if (typeof r === 'string') sy.msg = r;
+      else { sy.open = false; sy.digits = ''; setDelay(r, r ? `Synced with your TV: ${r}s behind live.` : 'Your TV is level with live, so there\'s no delay.'); return; }
+    }
+  }
+  render();
+}
+/* The delay that makes the round clock read `left` (seconds) right now, from the newest UFC.com data. */
+function syncToTv(left) {
+  const at = now();
+  const last = S.ufc.length ? S.ufc[S.ufc.length - 1] : null;
+  if (!last || at - last.at > 120000) return 'Can\'t sync right now: the live round clock isn\'t coming through. Use −5s and +5s instead.';
+  let best = null;
+  for (const f of last.data.fights || []) {
+    const rounds = [];
+    for (const t of f.log || []) {
+      const ts = ufcTime(t.Timestamp), ty = t.Type || '';
+      if (ty === 'round_start') rounds.push({ at: ts, pauses: [] });
+      else if (rounds.length && ty === 'round_pause') rounds[rounds.length - 1].pauses.push([ts, 0]);
+      else if (rounds.length && ty === 'round_unpause') { const p = rounds[rounds.length - 1].pauses; if (p.length && !p[p.length - 1][1]) p[p.length - 1][1] = ts; }
+    }
+    if (rounds.length && (!best || rounds[rounds.length - 1].at > best[best.length - 1].at)) best = rounds;
+  }
+  if (!best || at - best[best.length - 1].at > 45 * 60000) return 'There\'s no round on right now. Sync while a round is on, when the TV shows the clock.';
+  // Newest round first: the TV is either in the same round as live, or still in an earlier one.
+  for (let i = best.length - 1; i >= 0; i--) {
+    let pos = best[i].at + (300 - left) * 1000;
+    for (const [a, b] of best[i].pauses) if (a < pos) pos += (b || at) - a;
+    const d = Math.round((at - pos) / 1000);
+    // A few seconds 'ahead' is the feed's own lag or a slow tap: that means level with live.
+    if (d >= -30) return d > MAX_DELAY ? `That puts your TV over ${MAX_DELAY / 60} minutes behind. Check the time and try again.` : Math.max(0, d);
+  }
+  return 'Your TV looks ahead of the live data. Check the time and try again.';
 }
 
 /* ---------- Watch: the user's own IPTV login (Xtream Codes) ----------
@@ -1110,7 +1207,7 @@ document.addEventListener('input', e => { if (e.target.id === 'tvQ') { TV.q = e.
 
 S.alerts = 'off'; S.alertMsg = '';
 bootAlerts();
-S.delay = DELAYS.includes(+lsGet('delay')) ? +lsGet('delay') : 0;
+S.delay = clampDelay(+lsGet('delay'));
 schedule(true);
 setInterval(schedule, 1000);
 setInterval(tick, 1000);
