@@ -2,7 +2,7 @@
 <html lang="en-GB">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
 <title>Cageside</title>
 <meta name="description" content="Live UFC fight night companion: the fight on now, round clock, live stats, up next and results.">
 <meta name="theme-color" content="#0e1219">
@@ -27,7 +27,9 @@
   color-scheme:dark;
 }
 *{box-sizing:border-box}
-html{-webkit-text-size-adjust:100%;background:var(--bg)}
+html{-webkit-text-size-adjust:100%;background:var(--bg);touch-action:pan-x pan-y}
+/* No zooming: double-tap and pinch are both off, so the page always stays fully zoomed out. */
+button,a,.chip{touch-action:manipulation}
 body{margin:0;background:var(--bg);color:var(--fg);font:15px/1.45 var(--body);padding-bottom:calc(28px + env(safe-area-inset-bottom,0px));-webkit-tap-highlight-color:transparent}
 button{font:inherit;color:inherit}
 .wrap{max-width:560px;margin:0 auto;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
@@ -878,6 +880,10 @@ S.delay = DELAYS.includes(+lsGet('delay')) ? +lsGet('delay') : 0;
 schedule(true);
 setInterval(schedule, 1000);
 setInterval(tick, 1000);
+
+// iPhone ignores user-scalable=no, so stop pinch zoom here (WebKit gesture events and two-finger moves). touch-action in the CSS stops double-tap zoom.
+['gesturestart', 'gesturechange', 'gestureend'].forEach(t => document.addEventListener(t, e => e.preventDefault(), { passive: false }));
+document.addEventListener('touchmove', e => { if (e.touches.length > 1 || (e.scale && e.scale !== 1)) e.preventDefault(); }, { passive: false });
 </script>
 </body>
 </html>
