@@ -1,0 +1,26 @@
+# Cageside alerts: lock-screen notifications (ntfy topic cageside-ufc-7rk2) while a UFC card is on.
+# Checks every two hours on Saturdays and Sundays (UK and US cards both land then); a run leaves at
+# once when no card is on or close, follows the card to its end otherwise, and a queued run carries on
+# if one hits its time limit. Run it by hand from the Actions tab for a card on another day.
+name: Cageside alerts
+on:
+  schedule:
+    - cron: "5 */2 * * 6,0"
+  workflow_dispatch:
+concurrency:
+  group: cageside-alerts
+  cancel-in-progress: false
+jobs:
+  alerts:
+    runs-on: ubuntu-latest
+    timeout-minutes: 350
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          sparse-checkout: ufc
+      - name: Follow the card and send alerts
+        run: python3 ufc/alerts.py
+        env:
+          CAGESIDE_TOPIC: cageside-ufc-7rk2
+          CAGESIDE_MAX_HOURS: "5.6"
+          CAGESIDE_STATE: ${{ runner.temp }}/cageside-state.json
