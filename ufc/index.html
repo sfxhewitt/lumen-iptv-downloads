@@ -138,7 +138,12 @@ section{margin-top:22px}
 .fl.lost .n{color:var(--muted);font-weight:500}
 .how{font-size:13px;color:var(--fg);margin-top:6px}
 .how span{color:var(--muted)}
-.res{padding:11px 14px;display:grid;gap:3px}
+.res{padding:11px 14px;display:grid;grid-template-columns:auto 1fr;gap:12px;align-items:center}
+.res .txt{display:grid;gap:3px;min-width:0}
+.avs{position:relative;width:76px;height:52px;flex:none}
+.avs .a{position:absolute;top:0;left:0;width:52px;height:52px;border-radius:50%;object-fit:cover;object-position:50% 12%;background:var(--panel2);border:2px solid var(--gold);z-index:2;display:grid;place-items:center;font:800 18px/1 var(--display);color:var(--fg)}
+.avs .a.l{left:32px;top:6px;width:42px;height:42px;border-color:var(--line);filter:grayscale(1);opacity:.7;z-index:1;font-size:14px}
+.avs .a.n{border-color:var(--line)}
 .res .w1{font-weight:600}
 .res .w1 b{font:800 18px/1 var(--display);text-transform:uppercase;letter-spacing:.01em}
 .res .m{font-size:13px;color:var(--muted)}
@@ -154,6 +159,7 @@ section{margin-top:22px}
 .tape a{color:var(--muted);font-size:12.5px}
 .seghead{padding:10px 14px;background:var(--panel2);display:flex;justify-content:space-between;font:700 14px/1 var(--display);letter-spacing:.12em;text-transform:uppercase;color:var(--muted)}
 .seghead span{font-family:var(--body);letter-spacing:0;text-transform:none;font-weight:500;font-size:12.5px}
+.note{margin-top:10px;font-size:13px;color:var(--gold);line-height:1.4}
 .err{margin-top:14px;padding:12px 14px;border-radius:12px;border:1px solid rgba(242,184,75,.4);background:rgba(242,184,75,.08);color:var(--gold);font-size:13.5px}
 footer{margin-top:26px;font-size:12px;color:var(--dim);line-height:1.6}
 .skeleton{height:220px;border-radius:18px;background:linear-gradient(90deg,var(--panel) 0%,var(--panel2) 50%,var(--panel) 100%);background-size:200% 100%;animation:sh 1.4s infinite}
@@ -190,6 +196,9 @@ const TZ = 'Europe/London';
 const UFC_SEED = { '600061665': 1348 };
 const UFC_KNOWN = 1348;
 const ROUND_MS = 300000;
+/* Push alerts: the sender's public key, and the mailbox the phone leaves its subscription in. */
+const VAPID_PUBLIC = 'BO5CqyagCNZSaw_W55Fn2EsqMWnLWONFTK1apDc0RQCOgf9x_gxXBP_uOx3Jw0z30tV331KUKcvB00nXtFGLRh0';
+const SUB_TOPIC = 'cageside-subs-q8m3vz';
 const DELAYS = [0, 15, 30, 45, 60, 90];
 
 const S = {
@@ -399,6 +408,7 @@ function model() {
 }
 
 /* ---------- Rendering ---------- */
+const headUrl = (id, w, h) => `https://a.espncdn.com/combiner/i?img=/i/headshots/mma/players/full/${encodeURIComponent(id)}.png&w=${w}&h=${h}`;
 function photo(f, cls) {
   const src = f.id ? `https://a.espncdn.com/combiner/i?img=/i/headshots/mma/players/full/${encodeURIComponent(f.id)}.png&w=240&h=175` : '';
   return `<div class="photo">${src ? `<img src="${esc(src)}" alt="" loading="lazy" onerror="this.outerHTML='<div class=&quot;ini&quot;>${initials(f)}</div>'">` : `<div class="ini">${initials(f)}</div>`}</div>`;
@@ -545,12 +555,16 @@ function renderNext(m) {
 
 function renderResults(m) {
   if (!m.done.length) return '';
+  const av = (p, cls) => p.id
+    ? `<img class="a ${cls}" src="${esc(headUrl(p.id, 120, 88))}" alt="${esc(p.name)}" loading="lazy" onerror="this.outerHTML='<div class=&quot;a ${cls}&quot;>${initials(p)}</div>'">`
+    : `<div class="a ${cls}">${initials(p)}</div>`;
   const rows = m.done.map(f => {
     const w = f.winner === 1 ? f.red : f.winner === 2 ? f.blue : null;
     const l = f.winner === 1 ? f.blue : f.winner === 2 ? f.red : null;
     const mt = methodText(f);
     const head = w ? `<span class="w1"><b>${esc(w.last)}</b> beat ${esc(l.name)}</span>` : `<span class="w1"><b>${esc(f.red.last)} v ${esc(f.blue.last)}</b></span>`;
-    return `<div class="res">${head}<span class="m">${esc(mt || (w ? '' : 'Result to come'))}${f.weight ? ' · ' + esc(f.weight) : ''}</span></div>`;
+    const pics = w ? av(l, 'l') + av(w, 'w') : av(f.blue, 'l n') + av(f.red, 'n');
+    return `<div class="res"><div class="avs">${pics}</div><div class="txt">${head}<span class="m">${esc(mt || (w ? '' : 'Result to come'))}${f.weight ? ' · ' + esc(f.weight) : ''}</span></div></div>`;
   });
   return `<div class="h2"><h2>Results so far</h2><span>${m.done.length} of ${m.fights.length}</span></div><div class="list">${rows.map(r => `<div class="row">${r}</div>`).join('')}</div>`;
 }
@@ -633,7 +647,9 @@ function renderEvent(m) {
   <div class="chips">${status}
     <button type="button" class="chip" id="delayBtn" aria-pressed="${S.delay > 0}" title="Hold the live data back to match your TV stream">${delay}</button>
     ${'wakeLock' in navigator ? `<button type="button" class="chip" id="wakeBtn" aria-pressed="${S.wakeOn}">${S.wakeOn ? 'Screen stays on' : 'Keep screen on'}</button>` : ''}
+    <button type="button" class="chip" id="alertBtn" aria-pressed="${S.alerts === 'on'}">${S.alerts === 'on' ? 'Alerts on' : 'Turn on alerts'}</button>
   </div>
+  ${S.alertMsg ? `<div class="note">${esc(S.alertMsg)}</div>` : ''}
   <div class="watch"><span class="tv">TNT Sports</span><span class="times">UK · ${segs}</span></div>`;
 }
 
@@ -787,6 +803,7 @@ document.addEventListener('click', async e => {
     S.delay = DELAYS[(i + 1) % DELAYS.length];
     lsSet('delay', S.delay); render(); return;
   }
+  if (e.target.closest('#alertBtn')) { turnOnAlerts(); return; }
   if (e.target.closest('#wakeBtn')) {
     if (S.wakeOn) { S.wakeOn = false; try { S.wake && await S.wake.release(); } catch (x) {} S.wake = null; }
     else { S.wakeOn = true; await getWake(); }
@@ -802,6 +819,61 @@ document.addEventListener('visibilitychange', () => {
   if (!document.hidden) { if (S.wakeOn && !S.wake) getWake(); due.fc = 0; due.ufc = 0; due.st = 0; schedule(); }
 });
 
+/* ---------- Alerts (Web Push to the Home Screen app) ---------- */
+const pushSupported = () => 'serviceWorker' in navigator && 'PushManager' in window && 'Notification' in window;
+const standalone = () => navigator.standalone === true || (window.matchMedia && matchMedia('(display-mode: standalone)').matches);
+function b64u(s) {
+  const pad = '='.repeat((4 - s.length % 4) % 4);
+  const raw = atob((s + pad).replace(/-/g, '+').replace(/_/g, '/'));
+  return Uint8Array.from(raw, c => c.charCodeAt(0));
+}
+async function sendSub(sub) {
+  const r = await fetch('https://ntfy.sh/' + SUB_TOPIC, { method: 'POST', body: JSON.stringify({ sub: sub.toJSON() }) });
+  if (!r.ok) throw new Error('mailbox answered ' + r.status);
+  lsSet('subPostedAt', now());
+}
+async function turnOnAlerts() {
+  if (!pushSupported()) {
+    S.alertMsg = standalone()
+      ? 'This Home Screen copy can\'t get alerts. Open is.gd/cagesideufc in Safari, tap Share, then Add to Home Screen, and use the new icon.'
+      : 'Alerts work when Cageside is opened from its Home Screen icon. In Safari tap Share, then Add to Home Screen, and open it from there.';
+    render(); return;
+  }
+  // Ask first, straight from the tap: iPhone only shows the prompt for a direct tap.
+  const perm = await (Notification.permission === 'default' ? Notification.requestPermission() : Promise.resolve(Notification.permission));
+  if (perm !== 'granted') {
+    S.alertMsg = perm === 'denied' ? 'Notifications are blocked for Cageside. Turn them on in Settings > Notifications > Cageside, then tap again.' : 'Alerts are still off.';
+    render(); return;
+  }
+  S.alertMsg = 'Turning alerts on…'; render();
+  try {
+    const reg = await navigator.serviceWorker.register('sw.js');
+    await navigator.serviceWorker.ready;
+    let sub = await reg.pushManager.getSubscription();
+    if (!sub) sub = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: b64u(VAPID_PUBLIC) });
+    await sendSub(sub);
+    S.alerts = 'on'; lsSet('alerts', 'on');
+    S.alertMsg = 'Alerts on. A test alert should arrive within a minute.';
+  } catch (x) {
+    S.alertMsg = 'Couldn\'t turn alerts on (' + (x && x.message || x) + '). Try again in a moment.';
+  }
+  render();
+}
+async function bootAlerts() {
+  if (!pushSupported()) return;
+  try {
+    const reg = await navigator.serviceWorker.register('sw.js');
+    if (Notification.permission !== 'granted') return;
+    const sub = await reg.pushManager.getSubscription();
+    if (!sub) { S.alerts = 'off'; render(); return; }
+    S.alerts = 'on'; render();
+    // Leave the subscription in the mailbox again now and then, so a restarted sender still has it.
+    if (now() - (+lsGet('subPostedAt') || 0) > 6 * 3600e3) await sendSub(sub);
+  } catch (x) { /* alerts stay as they were */ }
+}
+
+S.alerts = 'off'; S.alertMsg = '';
+bootAlerts();
 S.delay = DELAYS.includes(+lsGet('delay')) ? +lsGet('delay') : 0;
 schedule(true);
 setInterval(schedule, 1000);
