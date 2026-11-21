@@ -1,11 +1,14 @@
 {
-  "versionCode": 245,
-  "versionName": "1.0.245",
-  "url": "https://raw.githubusercontent.com/sfxhewitt/lumen-iptv-downloads/6ca82bf312d231ecd062a1005dc1259598aca4ce/LUMEN.apk",
-  "size": 15752942,
-  "sha256": "687b0ca56eb290cdce24f4ecee53a483faa478209543c9174411b0787b5699f8",
+  "versionCode": 303,
+  "versionName": "1.0.303",
+  "url": "https://raw.githubusercontent.com/sfxhewitt/lumen-iptv-downloads/1229b0cdb7e893d041d13b202f2641cac188ab74/LUMEN.apk",
+  "size": 18714815,
+  "sha256": "a4f9e6162e7d0efd72bab29805f82858a7f11655085e9b1d78508968c0bfbff6",
   "notes": [
-    "Smart Now starts at the beginning",
-    "Smart Now keeps your place"
+    "The guide opens at the current time",
+    "5.1 sound in Bluetooth headphones",
+    "Steadier sound on live channels",
+    "Live matches on LUMEN Home",
+    "Kids' picks for LUMEN Home"
   ]
 }
