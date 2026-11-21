@@ -723,7 +723,7 @@ function renderEvent(m) {
     <button type="button" class="chip" id="delayBtn" aria-pressed="${S.delay > 0}" title="Sync with your TV">${delay}</button>
     ${'wakeLock' in navigator ? `<button type="button" class="chip" id="wakeBtn" aria-pressed="${S.wakeOn}">${S.wakeOn ? 'Screen stays on' : 'Keep screen on'}</button>` : ''}
     <button type="button" class="chip" id="tvBtn" aria-pressed="${TV.open}">${TV.open ? 'Hide player' : 'Watch'}</button>
-    <button type="button" class="chip" id="alertBtn" aria-pressed="${S.alerts === 'on'}">${S.alerts === 'on' ? 'Alerts on' : 'Turn on alerts'}</button>
+    <button type="button" class="chip" id="alertBtn" aria-pressed="${S.alerts === 'on'}" title="${S.alerts === 'on' ? 'Tap to turn alerts off' : 'Tap to turn alerts on'}">${S.alerts === 'on' ? 'Alerts on · tap to turn off' : 'Turn on alerts'}</button>
   </div>
   ${S.alertMsg ? `<div class="note">${esc(S.alertMsg)}</div>` : ''}
   ${S.syncNote ? `<div class="note">${esc(S.syncNote.text)}</div>` : ''}
@@ -914,7 +914,7 @@ document.addEventListener('click', async e => {
   if (e.target.closest('#delayBtn')) { S.sync = { open: !S.sync.open, digits: '', msg: '' }; render(); return; }
   const key = e.target.closest('button[data-pad]');
   if (key) { padKey(key.dataset.pad); return; }
-  if (e.target.closest('#alertBtn')) { turnOnAlerts(); return; }
+  if (e.target.closest('#alertBtn')) { S.alerts === 'on' ? turnOffAlerts() : turnOnAlerts(); return; }
   if (e.target.closest('#tvBtn')) { tvToggle(); return; }
   const ch = e.target.closest('button[data-ch]');
   if (ch) { tvPlay(ch.dataset.ch); return; }
@@ -973,6 +973,20 @@ async function turnOnAlerts() {
     S.alertMsg = 'Alerts on. A test alert should arrive within a minute.';
   } catch (x) {
     S.alertMsg = 'Couldn\'t turn alerts on (' + (x && x.message || x) + '). Try again in a moment.';
+  }
+  render();
+}
+/* Off: drop this phone's subscription. The sender's next alert to it is refused, and it forgets the phone. */
+async function turnOffAlerts() {
+  S.alertMsg = 'Turning alerts off…'; render();
+  try {
+    const reg = await navigator.serviceWorker.getRegistration();
+    const sub = reg && await reg.pushManager.getSubscription();
+    if (sub) await sub.unsubscribe();
+    S.alerts = 'off'; lsSet('alerts', 'off');
+    S.alertMsg = 'Alerts off. Tap the chip again to turn them back on.';
+  } catch (x) {
+    S.alertMsg = 'Couldn\'t turn alerts off (' + (x && x.message || x) + '). Try again, or turn off Cageside in Settings > Notifications.';
   }
   render();
 }
