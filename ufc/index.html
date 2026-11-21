@@ -282,12 +282,13 @@ function untilText(ms) {
   return `${m}:${String(s % 60).padStart(2, '0')}`;
 }
 
-async function getJSON(url, ms = 8000) {
+async function getJSON(url, ms = 8000, info) {
   const c = new AbortController();
   const t = setTimeout(() => c.abort(), ms);
   try {
     const r = await fetch(url, { signal: c.signal, cache: 'no-store' });
     if (!r.ok) throw new Error('HTTP ' + r.status);
+    if (info) { const m = (r.headers.get('cache-control') || '').match(/max-age=(\d+)/); info.maxAge = m ? +m[1] : null; }
     return await r.json();
   } finally { clearTimeout(t); }
 }
@@ -416,6 +417,15 @@ function matchUfc(f, ucard) {
   }
   return null;
 }
+function espnLeft(f, at) {
+  const m = String((f && f.clock) || '').match(/^(\d+):(\d{2})$/);
+  if (!m || f.state !== 'in' || !f.period || /end|final|half|delay/i.test(f.detail || '')) return -1;
+  const secs = +m[1] * 60 + +m[2];
+  // Counts back up too, for a TV delay reaching back before this copy was made.
+  return Math.max(0, Math.min(300, secs - Math.floor((at - (f.clockAt || at)) / 1000)));
+}
+/* Time left in the round: UFC.com's clock when it's coming through, otherwise ESPN's. */
+function clockLeft(f, at) { const l = secondsLeft(f && f.u, at); return l >= 0 ? l : espnLeft(f, at); }
 function secondsLeft(u, at) {
   if (!u || !u.roundStart || u.between || u.over) return -1;
   const stopped = u.paused + (u.pausedAt ? at - u.pausedAt : 0);
@@ -453,10 +463,12 @@ function model() {
 }
 
 /* ---------- Rendering ---------- */
+const BAD_IMG = new Set(); // photos that failed to load: shown as initials from then on
+const imgOk = src => src && !BAD_IMG.has(src);
 const headUrl = (id, w, h) => `https://a.espncdn.com/combiner/i?img=/i/headshots/mma/players/full/${encodeURIComponent(id)}.png&w=${w}&h=${h}`;
 function photo(f, cls) {
   const src = f.id ? `https://a.espncdn.com/combiner/i?img=/i/headshots/mma/players/full/${encodeURIComponent(f.id)}.png&w=240&h=175` : '';
-  return `<div class="photo">${src ? `<img src="${esc(src)}" alt="" loading="lazy" onerror="this.outerHTML='<div class=&quot;ini&quot;>${initials(f)}</div>'">` : `<div class="ini">${initials(f)}</div>`}</div>`;
+  return `<div class="photo">${imgOk(src) ? `<img src="${esc(src)}" alt="" loading="lazy" onerror="BAD_IMG.add(this.src);this.outerHTML='<div class=&quot;ini&quot;>${initials(f)}</div>'">` : `<div class="ini">${initials(f)}</div>`}</div>`;
 }
 function flagImg(f) { return f.flag ? `<img src="${esc(f.flag)}" alt="">` : ''; }
 function methodText(f) {
@@ -566,7 +578,9 @@ function renderNow(m) {
     phase = '<b>Walkouts</b> · fighters on their way to the Octagon';
   } else if (f.period) {
     round = `<div class="round">Round<b class="num">${f.period} / ${rounds}</b></div>`;
-    phase = /end/i.test(f.detail) ? `<b>${esc(f.detail.replace(/End R/i, 'End of round '))}</b>` : `ESPN: ${esc(f.detail)}`;
+    const el = espnLeft(f, viewNow());
+    if (el >= 0) { clock = `<div class="clock" data-clock="1">${mmss(el)}</div>`; phase = 'Time left in the round'; }
+    else phase = /end/i.test(f.detail) ? `<b>${esc(f.detail.replace(/End R/i, 'End of round '))}</b>` : `ESPN: ${esc(f.detail)}`;
   } else {
     phase = '<b>Under way</b>';
   }
@@ -590,7 +604,7 @@ function renderNow(m) {
 function renderNext(m) {
   const f = m.next;
   if (!f || (!m.live && f.start > now())) return '';
-  const side = (p, c) => `<div class="side ${c}">${p.id ? `<img src="https://a.espncdn.com/combiner/i?img=/i/headshots/mma/players/full/${encodeURIComponent(p.id)}.png&w=120&h=88" alt="" onerror="this.outerHTML='<div class=&quot;mini&quot;>${initials(p)}</div>'">` : `<div class="mini">${initials(p)}</div>`}<div style="min-width:0"><div class="nm">${esc(p.last)}</div><div class="rec">${esc(p.rec)}</div></div></div>`;
+  const side = (p, c) => `<div class="side ${c}">${p.id && imgOk(headUrl(p.id, 120, 88)) ? `<img src="${esc(headUrl(p.id, 120, 88))}" alt="" onerror="BAD_IMG.add(this.src);this.outerHTML='<div class=&quot;mini&quot;>${initials(p)}</div>'">` : `<div class="mini">${initials(p)}</div>`}<div style="min-width:0"><div class="nm">${esc(p.last)}</div><div class="rec">${esc(p.rec)}</div></div></div>`;
   const segStarted = (m.starts[f.seg] || 0) <= now();
   const when = segStarted ? 'After this fight' : `${esc(f.seg)} starts ${esc(fmtTime(m.starts[f.seg]))} UK`;
   return `<div class="h2"><h2>Up next</h2></div>
@@ -600,8 +614,8 @@ function renderNext(m) {
 
 function renderResults(m) {
   if (!m.done.length) return '';
-  const av = (p, cls) => p.id
-    ? `<img class="a ${cls}" src="${esc(headUrl(p.id, 120, 88))}" alt="${esc(p.name)}" loading="lazy" onerror="this.outerHTML='<div class=&quot;a ${cls}&quot;>${initials(p)}</div>'">`
+  const av = (p, cls) => p.id && imgOk(headUrl(p.id, 120, 88))
+    ? `<img class="a ${cls}" src="${esc(headUrl(p.id, 120, 88))}" alt="${esc(p.name)}" loading="lazy" onerror="BAD_IMG.add(this.src);this.outerHTML='<div class=&quot;a ${cls}&quot;>${initials(p)}</div>'">`
     : `<div class="a ${cls}">${initials(p)}</div>`;
   const rows = m.done.map(f => {
     const w = f.winner === 1 ? f.red : f.winner === 2 ? f.blue : null;
@@ -724,8 +738,26 @@ function put(id, html) {
   const key = html.replace(/(data-(?:clock|until)="[^"]*">)[^<]*/g, '$1');
   if (lastHTML[id] === key) return;
   lastHTML[id] = key;
-  el.innerHTML = html;
+  const t = document.createElement('template');
+  t.innerHTML = html;
+  morph(el, t.content);
   el.hidden = !html;
+}
+/* Make `from` look like `to` by changing only what differs, so photos don't reload and nothing flashes. */
+function morph(from, to) {
+  if (from.nodeType === 1 && to.nodeType === 1) {
+    for (const a of [...from.attributes]) if (!to.hasAttribute(a.name)) from.removeAttribute(a.name);
+    for (const a of [...to.attributes]) if (from.getAttribute(a.name) !== a.value) from.setAttribute(a.name, a.value);
+  }
+  const a = [...from.childNodes], b = [...to.childNodes];
+  b.forEach((y, i) => {
+    const x = a[i];
+    if (!x) from.appendChild(y);
+    else if (x.nodeType !== y.nodeType || x.nodeName !== y.nodeName || (x.nodeName === 'IMG' && x.getAttribute('src') !== y.getAttribute('src'))) from.replaceChild(y, x);
+    else if (x.nodeType !== 1) { if (x.nodeValue !== y.nodeValue) x.nodeValue = y.nodeValue; }
+    else morph(x, y);
+  });
+  for (let i = a.length - 1; i >= b.length; i--) from.removeChild(a[i]);
 }
 
 function render() {
@@ -747,16 +779,21 @@ function renderFresh() {
   const el = $('#fresh'), tx = $('#freshText');
   const at = Math.max(S.fc.length ? S.fc[S.fc.length - 1].at : 0, S.ufc.length ? S.ufc[S.ufc.length - 1].at : 0);
   if (!at) { tx.textContent = S.errors.fc ? 'Offline' : 'Loading'; el.className = 'fresh' + (S.errors.fc ? ' warn' : ''); return; }
+  // Each feed is checked as often as it changes (ESPN every 30 s, UFC.com every few seconds), so the page
+  // is live while the last check of the feeds in use is on time.
+  const lastFc = S.fc.length ? S.fc[S.fc.length - 1].at : 0;
+  const lastU = S.ufc.length && S.ufcFails === 0 ? S.ufc[S.ufc.length - 1].at : 0;
+  const late = Math.max(now() - lastFc - 36000, lastU ? now() - lastU - 12000 : -1);
   const age = Math.round((now() - at) / 1000);
-  tx.textContent = age < 5 ? 'Live' : age < 90 ? `Updated ${age}s ago` : `Updated ${Math.round(age / 60)}m ago`;
-  el.className = 'fresh ' + (age < 45 ? 'ok' : 'warn');
+  tx.textContent = late <= 0 ? 'Live' : age < 90 ? `Updated ${age}s ago` : `Updated ${Math.round(age / 60)}m ago`;
+  el.className = 'fresh ' + (late <= 0 ? 'ok' : 'warn');
 }
 
 /* Second-by-second: the round clock and countdowns only. */
 function tick() {
   const m = model();
-  if (m && m.live && m.live.u) {
-    const left = secondsLeft(m.live.u, viewNow());
+  if (m && m.live) {
+    const left = clockLeft(m.live, viewNow());
     document.querySelectorAll('[data-clock]').forEach(el => { if (left >= 0) el.textContent = mmss(left); });
     if (left === 0) render();
   }
@@ -780,8 +817,17 @@ function eventId() {
 async function loadFc() {
   const id = eventId();
   if (!id) return;
-  try { const d = parseCenter(await getJSON(ESPN_FC(id))); push(S.fc, d); S.errors.fc = null; S.lastOk = now(); }
-  catch (e) { S.errors.fc = e.message || 'error'; }
+  const info = {};
+  try {
+    const d = parseCenter(await getJSON(ESPN_FC(id), 8000, info));
+    // ESPN makes a new copy every 30 s and says how long this one has left (max-age): the copy (and its
+    // round clock) dates from the start of that window, and the next one is out when it runs down.
+    const left = info.maxAge != null && info.maxAge <= 30 ? info.maxAge : null;
+    d.genAt = left != null ? now() - (30 - left) * 1000 : now();
+    d.fights.forEach(f => { f.clockAt = d.genAt; });
+    push(S.fc, d); S.errors.fc = null; S.lastOk = now();
+    S.fcNext = left != null ? now() + (left + 1) * 1000 : 0;
+  } catch (e) { S.errors.fc = e.message || 'error'; S.fcNext = now() + 3000; }
 }
 function ufcMatchesEvent(u, fc) {
   if (!u || !fc) return false;
@@ -850,11 +896,13 @@ async function run(key, fn) {
 function schedule(force) {
   if (document.hidden && !force) return;
   const t = now(), live = liveish();
-  const ufcOk = S.ufc.length && S.ufcFails === 0;
-  const iv = { sb: live ? 300e3 : 900e3, fc: live ? (ufcOk ? 20e3 : 10e3) : 120e3, ufc: live ? 5e3 : 0, st: live ? 10e3 : 0 };
-  if (force || t >= due.sb) { due.sb = t + iv.sb; run('sb', async () => { await loadSb(); await loadFc(); due.fc = now() + iv.fc; }); return; }
-  if (t >= due.fc) { due.fc = t + iv.fc; run('fc', loadFc); }
-  if (iv.ufc && t >= due.ufc) { due.ufc = t + (S.ufcFails > 3 ? 20e3 : iv.ufc); run('ufc', loadUfc); }
+  const iv = { sb: live ? 300e3 : 900e3, fc: live ? 31e3 : 120e3, ufc: live ? 3e3 : 0, st: live ? 6e3 : 0 };
+  if (force || t >= due.sb) { due.sb = t + iv.sb; run('sb', async () => { await loadSb(); await loadFc(); due.fc = S.fcNext ? Math.max(now() + 2000, S.fcNext) : now() + iv.fc; }); return; }
+  if (t >= due.fc) {
+    due.fc = t + iv.fc;
+    run('fc', async () => { await loadFc(); if (S.fcNext) due.fc = Math.max(now() + 2000, Math.min(due.fc, S.fcNext)); });
+  }
+  if (iv.ufc && t >= due.ufc) { due.ufc = t + (S.ufcFails > 3 ? 15e3 : iv.ufc); run('ufc', loadUfc); }
   if (iv.st && t >= due.st) { due.st = t + iv.st; run('st', loadStats); }
 }
 
@@ -986,7 +1034,17 @@ function padKey(k) {
 function syncToTv(left) {
   const at = now();
   const last = S.ufc.length ? S.ufc[S.ufc.length - 1] : null;
-  if (!last || at - last.at > 120000) return 'Can\'t sync right now: the live round clock isn\'t coming through. Use −5s and +5s instead.';
+  if (!last || at - last.at > 120000) {
+    // UFC.com's feed is down: use ESPN's round clock (good to a few seconds). A TV still in the
+    // previous round is a round plus the minute's break further back.
+    const fc = S.fc.length ? S.fc[S.fc.length - 1].data : null;
+    const f = fc && fc.fights.find(x => x.state === 'in');
+    const live = espnLeft(f, at);
+    if (live < 0) return 'Can\'t sync right now: the live round clock isn\'t coming through. Use −5s and +5s instead.';
+    let d = left - live;
+    if (d < -30) d += 360;
+    return d > MAX_DELAY ? `That puts your TV over ${MAX_DELAY / 60} minutes behind. Check the time and try again.` : Math.max(0, d);
+  }
   let best = null;
   for (const f of last.data.fights || []) {
     const rounds = [];
