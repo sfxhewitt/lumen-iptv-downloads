@@ -1,0 +1,811 @@
+<!doctype html>
+<html lang="en-GB">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Cageside</title>
+<meta name="description" content="Live UFC fight night companion: the fight on now, round clock, live stats, up next and results.">
+<meta name="theme-color" content="#0e1219">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Cageside">
+<link rel="apple-touch-icon" href="icon-180.png">
+<link rel="icon" type="image/png" href="icon-180.png">
+<link rel="manifest" href="manifest.json">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700;800&family=Inter:wght@400;500;600;700&display=swap">
+<style>
+/* Layout: one phone-width column; the fight on now leads, then up next, results, the full card. */
+:root{
+  --bg:#0e1219; --panel:#161c27; --panel2:#1d2533; --line:#283246; --fg:#eef2f8; --muted:#8d99ad; --dim:#5f6a7e;
+  --red:#e5484d; --red-soft:rgba(229,72,77,.18); --blue:#3d8bfd; --blue-soft:rgba(61,139,253,.18);
+  --gold:#f2b84b; --live:#ff4d4d; --ok:#3ccf91;
+  --display:"Barlow Condensed","Arial Narrow","Helvetica Neue",system-ui,sans-serif;
+  --body:Inter,-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,system-ui,sans-serif;
+  color-scheme:dark;
+}
+*{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%;background:var(--bg)}
+body{margin:0;background:var(--bg);color:var(--fg);font:15px/1.45 var(--body);padding-bottom:calc(28px + env(safe-area-inset-bottom,0px));-webkit-tap-highlight-color:transparent}
+button{font:inherit;color:inherit}
+.wrap{max-width:560px;margin:0 auto;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+.num{font-variant-numeric:tabular-nums}
+
+/* Top bar */
+.top{position:sticky;top:0;z-index:20;background:rgba(14,18,25,.9);-webkit-backdrop-filter:blur(14px);backdrop-filter:blur(14px);border-bottom:1px solid var(--line);padding-top:env(safe-area-inset-top,0px)}
+.top .wrap{display:flex;align-items:center;gap:10px;padding-block:10px}
+.brand{font:800 21px/1 var(--display);letter-spacing:.08em;text-transform:uppercase;display:flex;align-items:center;gap:8px}
+.brand i{width:18px;height:18px;display:inline-block;background:linear-gradient(90deg,var(--red) 50%,var(--blue) 50%);clip-path:polygon(30% 0,70% 0,100% 30%,100% 70%,70% 100%,30% 100%,0 70%,0 30%)}
+.fresh{margin-left:auto;display:flex;align-items:center;gap:6px;font-size:12px;color:var(--muted);background:none;border:0;padding:6px 0;cursor:pointer}
+.fresh .dot{width:8px;height:8px;border-radius:50%;background:var(--dim)}
+.fresh.ok .dot{background:var(--ok)}
+.fresh.warn .dot{background:var(--gold)}
+
+/* Event header */
+.event{padding-block:18px 6px}
+.eyebrow{font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);font-weight:600}
+h1{font:800 34px/1 var(--display);letter-spacing:.01em;text-transform:uppercase;margin:6px 0 10px;text-wrap:balance}
+.chips{display:flex;flex-wrap:wrap;gap:8px}
+.chip{display:inline-flex;align-items:center;gap:6px;border:1px solid var(--line);background:var(--panel);border-radius:999px;padding:6px 11px;font-size:13px;color:var(--fg);line-height:1.1}
+.chip b{font-weight:700}
+.chip.live{border-color:rgba(255,77,77,.5);background:rgba(255,77,77,.12)}
+.chip.live::before{content:"";width:8px;height:8px;border-radius:50%;background:var(--live);animation:pulse 1.4s infinite}
+button.chip{cursor:pointer}
+button.chip[aria-pressed="true"]{border-color:var(--gold);color:var(--gold)}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.25}}
+.watch{margin-top:12px;display:grid;grid-template-columns:auto 1fr;gap:4px 12px;align-items:center;background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:12px 14px}
+.watch .tv{font:800 18px/1 var(--display);letter-spacing:.04em;text-transform:uppercase}
+.watch .times{font-size:13px;color:var(--muted);text-align:right}
+.watch .times b{color:var(--fg);font-weight:600}
+
+/* Sections */
+section{margin-top:22px}
+.h2{display:flex;align-items:baseline;justify-content:space-between;gap:8px;margin:0 0 10px}
+.h2 h2{font:700 15px/1 var(--display);letter-spacing:.14em;text-transform:uppercase;color:var(--muted);margin:0}
+.h2 span{font-size:12px;color:var(--dim)}
+
+/* The fight on now */
+.now{background:linear-gradient(180deg,var(--panel2),var(--panel));border:1px solid var(--line);border-radius:18px;overflow:hidden}
+.now .meta{display:flex;justify-content:space-between;gap:8px;padding:12px 14px 0;font-size:12px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);font-weight:600}
+.face{display:grid;grid-template-columns:1fr auto 1fr;align-items:end;gap:6px;padding:6px 10px 0}
+.fighter{min-width:0;text-align:center}
+.photo{position:relative;height:118px;display:flex;align-items:flex-end;justify-content:center}
+.photo img{max-height:118px;max-width:100%;object-fit:contain;display:block}
+.photo .ini{width:84px;height:84px;margin-bottom:12px;border-radius:50%;display:grid;place-items:center;font:800 30px/1 var(--display);background:var(--panel);border:2px solid var(--line)}
+.fighter.r .ini{border-color:var(--red)} .fighter.b .ini{border-color:var(--blue)}
+.fname{font:800 25px/1 var(--display);text-transform:uppercase;letter-spacing:.01em;overflow-wrap:anywhere;padding-top:8px;border-top:3px solid var(--red)}
+.fighter.b .fname{border-top-color:var(--blue)}
+.fsub{font-size:12.5px;color:var(--muted);margin-top:4px}
+.fsub img{width:16px;height:11px;object-fit:cover;vertical-align:-1px;border-radius:2px;margin-right:4px}
+.vs{font:700 15px/1 var(--display);color:var(--dim);padding-bottom:26px;letter-spacing:.1em}
+.clockrow{display:flex;align-items:center;justify-content:center;gap:14px;padding:14px 14px 4px}
+.round{font:700 15px/1.1 var(--display);letter-spacing:.12em;text-transform:uppercase;color:var(--muted);text-align:right}
+.round b{display:block;font-size:30px;color:var(--fg);letter-spacing:.02em}
+.clock{font:800 64px/1 var(--display);letter-spacing:.01em;font-variant-numeric:tabular-nums;min-width:2.6ch;text-align:center}
+.clock.small{font-size:30px;color:var(--muted)}
+.phase{text-align:center;font-size:13.5px;color:var(--muted);padding:0 14px 12px}
+.phase b{color:var(--fg)}
+.banner{margin:0 14px 12px;padding:10px 12px;border-radius:12px;background:rgba(242,184,75,.12);border:1px solid rgba(242,184,75,.4);color:var(--gold);font-weight:600;text-align:center}
+.stats{padding:6px 14px 14px;display:grid;gap:10px}
+.srow{display:grid;grid-template-columns:4.2em 1fr 4.2em;align-items:center;gap:8px}
+.srow .v{font:700 18px/1 var(--display);font-variant-numeric:tabular-nums}
+.srow .v small{font:500 12px var(--body);color:var(--muted);margin-left:2px}
+.srow .v.r{text-align:left} .srow .v.b{text-align:right}
+.srow .lab{font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);text-align:center;margin-bottom:4px}
+.bar{display:flex;height:6px;border-radius:3px;overflow:hidden;background:var(--line)}
+.bar i{display:block;height:100%}
+.bar .r{background:var(--red)} .bar .b{background:var(--blue)}
+.stats .src{font-size:11px;color:var(--dim);text-align:center}
+.feed{border-top:1px solid var(--line);padding:10px 14px 12px;display:grid;gap:6px}
+.feed div{display:grid;grid-template-columns:4.6em 1fr;gap:8px;font-size:13.5px}
+.feed .t{color:var(--muted);font-variant-numeric:tabular-nums}
+.feed .k{color:var(--gold);font-weight:700}
+.feed .rc{color:var(--red);font-weight:600} .feed .bc{color:var(--blue);font-weight:600}
+.empty{background:var(--panel);border:1px dashed var(--line);border-radius:16px;padding:18px;text-align:center;color:var(--muted)}
+.empty b{display:block;color:var(--fg);font:700 22px/1.1 var(--display);text-transform:uppercase;letter-spacing:.02em;margin-bottom:4px}
+.countdown{font:800 44px/1 var(--display);color:var(--fg);font-variant-numeric:tabular-nums;margin:6px 0}
+
+/* Up next */
+.next{background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:12px 14px;display:grid;gap:8px}
+.next .pair{display:grid;grid-template-columns:1fr auto 1fr;gap:10px;align-items:center}
+.next .side{display:flex;align-items:center;gap:10px;min-width:0}
+.next .side.b{flex-direction:row-reverse;text-align:right}
+.next .side img,.next .side .mini{width:46px;height:46px;border-radius:50%;object-fit:cover;object-position:top;background:var(--panel2);flex:none;border:2px solid var(--red)}
+.next .side.b img,.next .side.b .mini{border-color:var(--blue)}
+.next .mini{display:grid;place-items:center;font:800 17px/1 var(--display)}
+.next .nm{font:800 20px/1 var(--display);text-transform:uppercase;overflow-wrap:anywhere}
+.next .rec{font-size:12.5px;color:var(--muted)}
+.next .when{font-size:12.5px;color:var(--muted);display:flex;justify-content:space-between;gap:8px}
+
+/* Results + card rows */
+.list{background:var(--panel);border:1px solid var(--line);border-radius:16px;overflow:hidden}
+.row{border-top:1px solid var(--line)}
+.row:first-child{border-top:0}
+.row>button{display:block;width:100%;text-align:left;background:none;border:0;padding:11px 14px;cursor:pointer}
+.row>button:focus-visible{outline:2px solid var(--gold);outline-offset:-2px}
+.rtop{display:flex;justify-content:space-between;gap:8px;font-size:11.5px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);font-weight:600;margin-bottom:6px}
+.pill{border-radius:6px;padding:2px 7px;font-size:11px;letter-spacing:.06em;font-weight:700;background:var(--panel2);color:var(--muted);white-space:nowrap}
+.pill.live{background:var(--live);color:#fff}
+.pill.fin{background:transparent;border:1px solid var(--line)}
+.fl{display:grid;grid-template-columns:10px 1fr auto auto;gap:8px;align-items:center;padding:1px 0}
+.fl .c{width:10px;height:10px;border-radius:2px;background:var(--red)}
+.fl.b .c{background:var(--blue)}
+.fl .n{font-weight:600;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.fl .rc{font-size:12.5px;color:var(--muted);font-variant-numeric:tabular-nums}
+.fl .w{font:800 13px/1 var(--display);color:#14110a;background:var(--gold);border-radius:4px;padding:3px 5px;letter-spacing:.05em}
+.fl.lost .n{color:var(--muted);font-weight:500}
+.how{font-size:13px;color:var(--fg);margin-top:6px}
+.how span{color:var(--muted)}
+.res{padding:11px 14px;display:grid;gap:3px}
+.res .w1{font-weight:600}
+.res .w1 b{font:800 18px/1 var(--display);text-transform:uppercase;letter-spacing:.01em}
+.res .m{font-size:13px;color:var(--muted)}
+.tape{padding:2px 14px 14px;display:grid;gap:0}
+.tape table{width:100%;border-collapse:collapse;font-size:13.5px;font-variant-numeric:tabular-nums}
+.tape td{padding:6px 0;border-top:1px solid var(--line)}
+.tape td:first-child{text-align:left;color:var(--fg);width:36%}
+.tape td:last-child{text-align:right;width:36%}
+.tape td.l{text-align:center;color:var(--muted);font-size:11px;letter-spacing:.07em;text-transform:uppercase}
+.tape .th td{border-top:0;font:800 16px/1.1 var(--display);text-transform:uppercase}
+.tape .th td:first-child{color:var(--red)} .tape .th td:last-child{color:var(--blue)}
+.tape .sub{font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--dim);padding:12px 0 2px;text-align:center}
+.tape a{color:var(--muted);font-size:12.5px}
+.seghead{padding:10px 14px;background:var(--panel2);display:flex;justify-content:space-between;font:700 14px/1 var(--display);letter-spacing:.12em;text-transform:uppercase;color:var(--muted)}
+.seghead span{font-family:var(--body);letter-spacing:0;text-transform:none;font-weight:500;font-size:12.5px}
+.err{margin-top:14px;padding:12px 14px;border-radius:12px;border:1px solid rgba(242,184,75,.4);background:rgba(242,184,75,.08);color:var(--gold);font-size:13.5px}
+footer{margin-top:26px;font-size:12px;color:var(--dim);line-height:1.6}
+.skeleton{height:220px;border-radius:18px;background:linear-gradient(90deg,var(--panel) 0%,var(--panel2) 50%,var(--panel) 100%);background-size:200% 100%;animation:sh 1.4s infinite}
+@keyframes sh{to{background-position:-200% 0}}
+@media (prefers-reduced-motion:reduce){*{animation:none!important}}
+@media (min-width:420px){h1{font-size:40px}.fname{font-size:28px}}
+</style>
+</head>
+<body>
+<header class="top">
+  <div class="wrap">
+    <div class="brand"><i aria-hidden="true"></i>Cageside</div>
+    <button class="fresh" id="fresh" type="button" title="Refresh now"><span class="dot"></span><span id="freshText">Loading</span></button>
+  </div>
+</header>
+
+<main class="wrap">
+  <div id="event" class="event"><div class="eyebrow">UFC</div><h1>Loading the card…</h1></div>
+  <div id="err"></div>
+  <section id="nowSec"><div class="h2"><h2>On now</h2></div><div class="skeleton"></div></section>
+  <section id="nextSec" hidden></section>
+  <section id="resSec" hidden></section>
+  <section id="cardSec" hidden></section>
+  <footer id="foot">Live data from ESPN and UFC.com. Times are UK time. Tap any fight for the tale of the tape.</footer>
+</main>
+
+<script>
+'use strict';
+const ESPN_SB = 'https://site.api.espn.com/apis/site/v2/sports/mma/ufc/scoreboard';
+const ESPN_FC = id => `https://site.web.api.espn.com/apis/common/v3/sports/mma/ufc/fightcenter/${id}?region=gb&lang=en`;
+const UFC = 'https://d29dxerjsp82wz.cloudfront.net/api/v3';
+const TZ = 'Europe/London';
+/* UFC.com's own number for ESPN cards already known (ESPN event id -> UFC.com event id). */
+const UFC_SEED = { '600061665': 1348 };
+const UFC_KNOWN = 1348;
+const ROUND_MS = 300000;
+const DELAYS = [0, 15, 30, 45, 60, 90];
+
+const S = {
+  sb: null, sbAt: 0,
+  fc: [],            // fight-centre snapshots [{at, data}]
+  ufc: [],           // UFC.com card snapshots [{at, data}]
+  ust: {},           // UFC.com fight stats by fight id: [{at, data}]
+  ufcId: null, scanAt: 0, ufcFails: 0,
+  open: new Set(), errors: {}, lastOk: 0,
+  delay: 0, wake: null, wakeOn: false,
+};
+
+const $ = s => document.querySelector(s);
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const norm = s => String(s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/[^a-z0-9 ]+/g, ' ').replace(/\s+/g, ' ').trim();
+const lastWord = s => { const w = norm(s).split(' '); return w[w.length - 1] || ''; };
+const same = (a, b) => { const x = lastWord(a), y = lastWord(b); return !!x && x === y; };
+const lsGet = k => { try { return localStorage.getItem(k); } catch (e) { return null; } };
+const lsSet = (k, v) => { try { localStorage.setItem(k, String(v)); } catch (e) {} };
+const timeFmt = new Intl.DateTimeFormat('en-GB', { timeZone: TZ, hour: 'numeric', minute: '2-digit', hour12: true });
+const dayFmt = new Intl.DateTimeFormat('en-GB', { timeZone: TZ, weekday: 'short', day: 'numeric', month: 'short' });
+const dayKey = new Intl.DateTimeFormat('en-GB', { timeZone: TZ, year: 'numeric', month: '2-digit', day: '2-digit' });
+const fmtTime = ms => timeFmt.format(new Date(ms)).replace(/\s/g, ' ');
+const fmtDay = ms => dayFmt.format(new Date(ms));
+const isToday = ms => dayKey.format(new Date(ms)) === dayKey.format(new Date());
+const mmss = s => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
+const initials = f => esc(((f.first || '')[0] || '') + ((f.last || '')[0] || '')).toUpperCase();
+const now = () => Date.now();
+const viewNow = () => now() - S.delay * 1000;
+
+function untilText(ms) {
+  let s = Math.max(0, Math.round((ms - now()) / 1000));
+  const h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60);
+  if (h >= 24) return `${Math.floor(h / 24)}d ${h % 24}h`;
+  if (h > 0) return `${h}h ${String(m).padStart(2, '0')}m`;
+  return `${m}:${String(s % 60).padStart(2, '0')}`;
+}
+
+async function getJSON(url, ms = 8000) {
+  const c = new AbortController();
+  const t = setTimeout(() => c.abort(), ms);
+  try {
+    const r = await fetch(url, { signal: c.signal, cache: 'no-store' });
+    if (!r.ok) throw new Error('HTTP ' + r.status);
+    return await r.json();
+  } finally { clearTimeout(t); }
+}
+
+/* ---------- TV delay: show what was true N seconds ago, so the phone doesn't spoil the TV ---------- */
+function push(arr, data) {
+  arr.push({ at: now(), data });
+  const keep = now() - (S.delay * 1000 + 120000);
+  while (arr.length > 2 && arr[1].at < keep) arr.shift();
+}
+function pick(arr) {
+  if (!arr || !arr.length) return null;
+  const cut = viewNow();
+  let best = null;
+  for (const s of arr) if (s.at <= cut) best = s;
+  return best || arr[0];
+}
+
+/* ---------- ESPN fight centre ---------- */
+function statMap(list) { const m = {}; (list || []).forEach(s => { m[s.name] = s.displayValue; }); return m; }
+function frac(v) { const m = String(v || '').match(/(\d+)\s*\/\s*(\d+)/); return m ? [+m[1], +m[2]] : null; }
+function parseFighter(c) {
+  const a = c.athlete || {};
+  return {
+    id: a.id, first: a.firstName || '', last: a.lastName || a.displayName || '', name: a.displayName || '',
+    rec: c.displayRecord || '', age: a.age, height: a.displayHeight, reach: a.displayReach, stance: a.stance && a.stance.text,
+    country: a.country, flag: a.flag && a.flag.href, head: a.headshot && a.headshot.href, link: a.link && a.link.href,
+    winner: !!c.winner, order: c.order || 9, st: statMap(c.stats),
+  };
+}
+function parseCenter(d) {
+  const fights = [];
+  for (const [segKey, card] of Object.entries(d.cards || {})) {
+    for (const c of card.competitions || []) {
+      const cs = (c.competitors || []).map(parseFighter).sort((x, y) => x.order - y.order);
+      if (cs.length < 2) continue;
+      const s = c.status || {}, t = s.type || {};
+      const note = c.note || '';
+      const ref = (c.officials || []).find(o => /referee/i.test((o.position && o.position.name) || ''));
+      const res = s.result && s.result.displayName ? s.result : null;
+      fights.push({
+        key: String(c.id), match: c.matchNumber || 99,
+        seg: (c.cardSegment && c.cardSegment.description) || (segKey === 'main' ? 'Main Card' : 'Prelims'),
+        start: Date.parse(c.date), weight: (c.type && c.type.text) || '', note,
+        main: /main event/i.test(note), title: /title|championship/i.test(note),
+        state: t.state || 'pre', detail: t.shortDetail || t.detail || '', period: +s.period || 0, clock: s.displayClock,
+        result: res ? { method: res.displayName, how: res.displayDescription || '', target: res.target && res.target.displayDescription || '' } : null,
+        ref: ref ? `${ref.firstName || ''} ${ref.lastName || ''}`.trim() : '',
+        red: cs[0], blue: cs[1],
+      });
+    }
+  }
+  fights.sort((a, b) => a.match - b.match);
+  return { event: d.event || {}, venue: d.venue || {}, fights };
+}
+
+/* ---------- UFC.com live feed (the fight tracker's own JSON: round clock and play-by-play) ---------- */
+function ufcTime(s) {
+  if (!s || s === 'null') return 0;
+  let x = String(s);
+  if (/Z$/.test(x) && x.length === 17) x = x.slice(0, -1) + ':00Z';
+  const v = Date.parse(x);
+  return isNaN(v) ? 0 : v;
+}
+function parseUfc(j) {
+  const e = j && j.LiveEventDetail;
+  if (!e || !e.EventId) return null;
+  const fights = (e.FightCard || []).map(f => {
+    const ps = f.Fighters || [];
+    if (ps.length < 2) return null;
+    let red = ps[0], blue = ps[1];
+    if (String(ps[1].Corner || '').toLowerCase() === 'red') { red = ps[1]; blue = ps[0]; }
+    let round = 0, roundStart = 0, paused = 0, pausedAt = 0, between = false, on = false, over = false, winnerId = 0;
+    const log = f.FightNightTracking || [];
+    for (const t of log) {
+      const at = ufcTime(t.Timestamp), ty = t.Type || '';
+      if (['fight_open', 'walkout', 'staredown', 'tale_of_the_tape'].includes(ty)) on = true;
+      else if (ty === 'round_start') { on = true; between = false; round = t.RoundNumber || round + 1; roundStart = at; paused = 0; pausedAt = 0; }
+      else if (ty === 'round_end') { between = true; pausedAt = 0; }
+      else if (ty === 'round_pause') { if (!pausedAt) pausedAt = at; }
+      else if (ty === 'round_unpause') { if (pausedAt) { paused += Math.max(0, at - pausedAt); pausedAt = 0; } }
+      else if (['fight_over', 'fight_complete', 'results'].includes(ty)) over = true;
+      if (ty.startsWith('unofficial_winner')) { over = true; winnerId = t.FighterId || 0; }
+    }
+    if (/^(final|complete)$/i.test(f.Status || '')) over = true;
+    const won = p => /win/i.test((p.Outcome && p.Outcome.Outcome) || '');
+    const winner = (won(red) || (winnerId && winnerId === red.FighterId)) ? 1 : (won(blue) || (winnerId && winnerId === blue.FighterId)) ? 2 : 0;
+    const r = f.Result || {};
+    const who = id => id === red.FighterId ? 'r' : id === blue.FighterId ? 'b' : '';
+    return {
+      id: f.FightId, order: f.FightOrder, status: f.Status || '', red, blue, who,
+      rounds: (f.RuleSet && f.RuleSet.PossibleRounds) || 3, round,
+      roundStart: (over || between) ? 0 : roundStart, paused, pausedAt,
+      on: on && !over, between: between && !over, over, winner,
+      method: r.Method || '', endRound: r.EndingRound, endTime: r.EndingTime, endHow: r.EndingSubmission || r.EndingStrike || '',
+      log,
+    };
+  }).filter(Boolean);
+  return { id: e.EventId, name: e.Name || '', start: ufcTime(e.StartTime), status: e.Status || '', liveFightId: e.LiveFightId, fights };
+}
+function parseUfcStats(j, uf) {
+  const d = j && j.LiveFightDetail;
+  if (!d || !Array.isArray(d.FightStats)) return null;
+  const of = id => d.FightStats.find(s => s.FighterId === id);
+  const one = s => s && ({
+    sig: [s.SigStrikesLanded, s.SigStrikesAttempted], total: [s.TotalStrikesLanded, s.TotalStrikesAttempted],
+    td: [s.TakedownsLanded, s.TakedownsAttempted], kd: s.Knockdowns, sub: s.SubmissionsAttempted, ctrl: s.ControlTime,
+    head: [s.SigHeadStrikesLanded, s.SigHeadStrikesAttempted], body: [s.SigBodyStrikesLanded, s.SigBodyStrikesAttempted], leg: [s.SigLegStrikesLanded, s.SigLegStrikesAttempted],
+  });
+  const r = one(of(uf.red.FighterId)), b = one(of(uf.blue.FighterId));
+  return r && b ? { r, b } : null;
+}
+function espnStats(f) {
+  const one = st => ({ sig: frac(st.sigStrikes), total: frac(st.totalStrikes), td: frac(st.takedowns), kd: st.knockDowns, sub: st.submissions, ctrl: st.timeInControl, head: frac(st.headStrikes), body: frac(st.bodyStrikes), leg: frac(st.legStrikes) });
+  if (!f.red.st.sigStrikes && !f.blue.st.sigStrikes) return null;
+  return { r: one(f.red.st), b: one(f.blue.st) };
+}
+
+/* Which UFC.com fight is this ESPN fight; flip when the corners are listed the other way round. */
+function matchUfc(f, ucard) {
+  if (!ucard) return null;
+  for (const u of ucard.fights) {
+    const rl = u.red.Name && u.red.Name.LastName, bl = u.blue.Name && u.blue.Name.LastName;
+    if (same(rl, f.red.last) && same(bl, f.blue.last)) return { u, flip: false };
+    if (same(rl, f.blue.last) && same(bl, f.red.last)) return { u, flip: true };
+  }
+  return null;
+}
+function secondsLeft(u, at) {
+  if (!u || !u.roundStart || u.between || u.over) return -1;
+  const stopped = u.paused + (u.pausedAt ? at - u.pausedAt : 0);
+  const gone = Math.floor((at - u.roundStart - stopped) / 1000);
+  return Math.max(0, Math.min(300, 300 - Math.max(0, gone)));
+}
+
+/* ---------- Merge: ESPN is the base, UFC.com is believed when it's a step ahead ---------- */
+function model() {
+  const fcS = pick(S.fc);
+  if (!fcS) return null;
+  const fc = fcS.data;
+  const uS = pick(S.ufc);
+  const ucard = uS && (viewNow() - uS.at < 150000) ? uS.data : null;
+  const fights = fc.fights.map(f => {
+    const m = matchUfc(f, ucard);
+    const u = m && m.u;
+    let state = f.state;
+    if (u) {
+      if (u.over || f.state === 'post') state = 'post';
+      else if (u.on || /live/i.test(u.status) || f.state === 'in') state = 'in';
+    }
+    let winner = f.red.winner ? 1 : f.blue.winner ? 2 : 0;
+    if (!winner && u && u.winner) winner = m.flip ? 3 - u.winner : u.winner;
+    return Object.assign({}, f, { state, u, flip: m ? m.flip : false, winner });
+  });
+  const live = fights.filter(f => f.state === 'in').sort((a, b) => a.match - b.match)[0] || null;
+  const pre = fights.filter(f => f.state === 'pre' && (!live || f.match < live.match)).sort((a, b) => b.match - a.match);
+  const next = pre[0] || null;
+  const done = fights.filter(f => f.state === 'post').sort((a, b) => a.match - b.match);
+  const starts = {};
+  for (const f of fights) if (!starts[f.seg] || f.start < starts[f.seg]) starts[f.seg] = f.start;
+  const first = fights.length ? Math.min(...fights.map(f => f.start)) : (Date.parse(fc.event.date) || now());
+  return { fc, fights, live, next, done, starts, first, ucard, fcAt: fcS.at, uAt: uS ? uS.at : 0 };
+}
+
+/* ---------- Rendering ---------- */
+function photo(f, cls) {
+  const src = f.id ? `https://a.espncdn.com/combiner/i?img=/i/headshots/mma/players/full/${encodeURIComponent(f.id)}.png&w=240&h=175` : '';
+  return `<div class="photo">${src ? `<img src="${esc(src)}" alt="" loading="lazy" onerror="this.outerHTML='<div class=&quot;ini&quot;>${initials(f)}</div>'">` : `<div class="ini">${initials(f)}</div>`}</div>`;
+}
+function flagImg(f) { return f.flag ? `<img src="${esc(f.flag)}" alt="">` : ''; }
+function methodText(f) {
+  const u = f.u;
+  let m = ((f.result && f.result.method) || (u && u.method) || '').replace(/^Decision\s*-\s*(\w+)/i, (x, k) => `${k} decision`);
+  let how = (f.result && f.result.how) || (u && u.endHow) || '';
+  if (how && m && !m.toLowerCase().includes(how.toLowerCase())) m += ` (${how})`;
+  let rd = '', tm = '';
+  if (u && u.endRound) { rd = u.endRound; tm = u.endTime || ''; }
+  else if (f.state === 'post' && f.period) { rd = f.period; tm = f.clock && f.clock !== '-' ? f.clock : ''; }
+  const when = rd ? `R${rd}${tm ? ' ' + tm : ''}` : '';
+  return [m, when].filter(Boolean).join(' · ');
+}
+function statRow(label, r, b, fmt) {
+  const rv = fmt(r), bv = fmt(b);
+  const rn = Array.isArray(r) ? (r[0] || 0) : (typeof r === 'string' && r.includes(':') ? toSec(r) : (+r || 0));
+  const bn = Array.isArray(b) ? (b[0] || 0) : (typeof b === 'string' && b.includes(':') ? toSec(b) : (+b || 0));
+  const tot = rn + bn;
+  const rp = tot ? (rn / tot) * 100 : 50;
+  return `<div class="srow"><div class="v r">${rv}</div><div><div class="lab">${esc(label)}</div><div class="bar"><i class="r" style="width:${rp.toFixed(1)}%"></i><i class="b" style="width:${(100 - rp).toFixed(1)}%"></i></div></div><div class="v b">${bv}</div></div>`;
+}
+function toSec(s) { const m = String(s || '').match(/(\d+):(\d+)/); return m ? (+m[1]) * 60 + (+m[2]) : 0; }
+const fLA = v => Array.isArray(v) ? `${v[0] ?? 0}<small>/${v[1] ?? 0}</small>` : '–';
+const fN = v => (v === undefined || v === null || v === '') ? '–' : esc(v);
+
+function statsBlock(st, src) {
+  if (!st) return '';
+  const { r, b } = st;
+  return `<div class="stats">
+    ${statRow('Sig. strikes', r.sig, b.sig, fLA)}
+    ${statRow('Total strikes', r.total, b.total, fLA)}
+    ${statRow('Takedowns', r.td, b.td, fLA)}
+    ${statRow('Knockdowns', r.kd, b.kd, fN)}
+    ${statRow('Control time', r.ctrl || '0:00', b.ctrl || '0:00', fN)}
+    ${statRow('Sub attempts', r.sub, b.sub, fN)}
+    ${statRow('Head (sig.)', r.head, b.head, fLA)}
+    ${statRow('Body (sig.)', r.body, b.body, fLA)}
+    ${statRow('Legs (sig.)', r.leg, b.leg, fLA)}
+    <div class="src">${esc(src)}</div>
+  </div>`;
+}
+
+const FEED = {
+  walkout: 'walks out', knockdown: 'KNOCKDOWN', takedown: 'takedown', reversal: 'reversal',
+  submission_attempt: 'submission attempt', sub_attempt: 'submission attempt', point_deduction: 'point deducted',
+};
+function feedBlock(f) {
+  const u = f.u;
+  if (!u || !u.log || !u.log.length) return '';
+  const name = id => { const w = u.who(id); if (!w) return ''; const p = w === 'r' ? u.red : u.blue; const corner = (w === 'r') !== f.flip ? 'rc' : 'bc'; return `<span class="${corner}">${esc(p.Name && p.Name.LastName)}</span>`; };
+  const cut = viewNow();
+  const items = [];
+  for (let i = u.log.length - 1; i >= 0 && items.length < 6; i--) {
+    const t = u.log[i], ty = t.Type || '';
+    if (ufcTime(t.Timestamp) > cut) continue;
+    const at = t.RoundNumber ? `R${t.RoundNumber} ${t.RoundTime || ''}` : '';
+    let txt = '';
+    if (ty === 'round_start') txt = `Round ${t.RoundNumber || ''} starts`;
+    else if (ty === 'round_end') txt = `End of round ${t.RoundNumber || ''}`;
+    else if (ty === 'knockdown') txt = `${name(t.FighterId)} <span class="k">knockdown!</span>`;
+    else if (ty.startsWith('unofficial_winner')) txt = `${name(t.FighterId)} wins (unofficial)`;
+    else if (ty === 'fight_over') txt = 'Fight over';
+    else if (ty === 'round_pause') txt = 'Fight paused';
+    else if (ty === 'round_unpause') txt = 'Fight back on';
+    else if (FEED[ty]) txt = `${name(t.FighterId)} ${FEED[ty]}`;
+    else continue;
+    items.push(`<div><span class="t">${esc(at)}</span><span>${txt}</span></div>`);
+  }
+  return items.length ? `<div class="feed">${items.join('')}</div>` : '';
+}
+
+function faceOff(f) {
+  const side = (p, c) => `<div class="fighter ${c}">${photo(p)}<div class="fname">${esc(p.last)}</div><div class="fsub">${flagImg(p)}${esc(p.rec || '')}</div></div>`;
+  return `<div class="face">${side(f.red, 'r')}<div class="vs">VS</div>${side(f.blue, 'b')}</div>`;
+}
+
+function renderNow(m) {
+  const f = m.live;
+  if (!f) {
+    // Nothing on: a countdown to the first fight, the gap before the main card, or the night's done.
+    const allDone = m.fights.length && m.fights.every(x => x.state === 'post');
+    if (allDone) {
+      const me = m.fights[0];
+      const w = me.winner === 1 ? me.red : me.winner === 2 ? me.blue : null;
+      return `<div class="h2"><h2>Tonight</h2></div><div class="empty"><b>Card finished</b>${w ? `${esc(w.name)} won the main event · ${esc(methodText(me))}` : 'All fights are over.'}</div>`;
+    }
+    const nx = m.next;
+    if (nx && nx.start > now()) {
+      return `<div class="h2"><h2>${m.done.length ? 'Break' : 'Starts soon'}</h2></div><div class="empty"><b>${esc(nx.seg)} starts in</b><div class="countdown num" data-until="${nx.start}">${untilText(nx.start)}</div>${esc(fmtDay(nx.start))}, ${esc(fmtTime(nx.start))} UK · TNT Sports</div>`;
+    }
+    return `<div class="h2"><h2>On now</h2></div><div class="empty"><b>Between fights</b>Next fight coming up shortly.</div>`;
+  }
+  const u = f.u;
+  const rounds = (u && u.rounds) || (f.main || f.title ? 5 : 3);
+  let clock = '', round = '', phase = '', banner = '';
+  const left = secondsLeft(u, viewNow());
+  if (u && u.over) {
+    banner = 'Fight over · waiting for the result';
+  } else if (u && left >= 0) {
+    round = `<div class="round">Round<b class="num">${u.round} / ${rounds}</b></div>`;
+    clock = `<div class="clock" data-clock="1">${mmss(left)}</div>`;
+    phase = u.pausedAt ? '<b>Paused</b> · clock stopped' : 'Time left in the round';
+  } else if (u && u.between) {
+    round = `<div class="round">End of<b class="num">R${u.round} / ${rounds}</b></div>`;
+    phase = u.round < rounds ? `<b>Between rounds</b> · round ${u.round + 1} next` : '<b>Going to the judges</b>';
+  } else if (u && u.on && !u.round) {
+    phase = '<b>Walkouts</b> · fighters on their way to the Octagon';
+  } else if (f.period) {
+    round = `<div class="round">Round<b class="num">${f.period} / ${rounds}</b></div>`;
+    phase = /end/i.test(f.detail) ? `<b>${esc(f.detail.replace(/End R/i, 'End of round '))}</b>` : `ESPN: ${esc(f.detail)}`;
+  } else {
+    phase = '<b>Under way</b>';
+  }
+  let st = null, src = '';
+  if (u) {
+    const ss = pick(S.ust[u.id]);
+    if (ss && ss.data && viewNow() - ss.at < 60000) { st = f.flip ? { r: ss.data.b, b: ss.data.r } : ss.data; src = 'Fight stats: UFC.com'; }
+  }
+  if (!st) { st = espnStats(f); src = st ? 'Fight stats: ESPN' : ''; }
+  const meta = `<div class="meta"><span>${esc(f.weight)}${f.main ? ' · Main event' : f.title ? ' · Title' : ''}</span><span>${rounds} rounds</span></div>`;
+  return `<div class="h2"><h2>On now</h2><span>${esc(f.seg)}</span></div>
+  <div class="now">${meta}${faceOff(f)}
+    ${round || clock ? `<div class="clockrow">${round}${clock}</div>` : ''}
+    ${phase ? `<div class="phase">${phase}</div>` : ''}
+    ${banner ? `<div class="banner">${esc(banner)}</div>` : ''}
+    ${statsBlock(st, src) || '<div class="phase">Stats appear once round 1 starts.</div>'}
+    ${feedBlock(f)}
+  </div>`;
+}
+
+function renderNext(m) {
+  const f = m.next;
+  if (!f || (!m.live && f.start > now())) return '';
+  const side = (p, c) => `<div class="side ${c}">${p.id ? `<img src="https://a.espncdn.com/combiner/i?img=/i/headshots/mma/players/full/${encodeURIComponent(p.id)}.png&w=120&h=88" alt="" onerror="this.outerHTML='<div class=&quot;mini&quot;>${initials(p)}</div>'">` : `<div class="mini">${initials(p)}</div>`}<div style="min-width:0"><div class="nm">${esc(p.last)}</div><div class="rec">${esc(p.rec)}</div></div></div>`;
+  const segStarted = (m.starts[f.seg] || 0) <= now();
+  const when = segStarted ? 'After this fight' : `${esc(f.seg)} starts ${esc(fmtTime(m.starts[f.seg]))} UK`;
+  return `<div class="h2"><h2>Up next</h2></div>
+  <div class="next"><div class="when"><span>${esc(f.weight)}${f.main ? ' · Main event' : ''}</span><span>${when}</span></div>
+  <div class="pair">${side(f.red, 'r')}<div class="vs" style="padding:0">VS</div>${side(f.blue, 'b')}</div></div>`;
+}
+
+function renderResults(m) {
+  if (!m.done.length) return '';
+  const rows = m.done.map(f => {
+    const w = f.winner === 1 ? f.red : f.winner === 2 ? f.blue : null;
+    const l = f.winner === 1 ? f.blue : f.winner === 2 ? f.red : null;
+    const mt = methodText(f);
+    const head = w ? `<span class="w1"><b>${esc(w.last)}</b> beat ${esc(l.name)}</span>` : `<span class="w1"><b>${esc(f.red.last)} v ${esc(f.blue.last)}</b></span>`;
+    return `<div class="res">${head}<span class="m">${esc(mt || (w ? '' : 'Result to come'))}${f.weight ? ' · ' + esc(f.weight) : ''}</span></div>`;
+  });
+  return `<div class="h2"><h2>Results so far</h2><span>${m.done.length} of ${m.fights.length}</span></div><div class="list">${rows.map(r => `<div class="row">${r}</div>`).join('')}</div>`;
+}
+
+function tape(f) {
+  const r = f.red, b = f.blue;
+  const ur = f.u ? (f.flip ? f.u.blue : f.u.red) : null, ub = f.u ? (f.flip ? f.u.red : f.u.blue) : null;
+  const row = (a, l, c) => `<tr><td>${a}</td><td class="l">${esc(l)}</td><td>${c}</td></tr>`;
+  const v = x => (x === undefined || x === null || x === '') ? '–' : esc(x);
+  const nick = p => p && p.Name && p.Name.NickName ? `“${esc(p.Name.NickName)}”` : '';
+  let h = `<table><tr class="th"><td>${esc(r.name)}</td><td></td><td>${esc(b.name)}</td></tr>`;
+  if (nick(ur) || nick(ub)) h += row(nick(ur) || '–', 'Nickname', nick(ub) || '–');
+  h += row(v(r.rec), 'Record', v(b.rec));
+  h += row(v(r.age), 'Age', v(b.age));
+  h += row(v(r.height), 'Height', v(b.height));
+  h += row(v(r.reach), 'Reach', v(b.reach));
+  h += row(v(r.stance), 'Stance', v(b.stance));
+  h += row(v(r.country), 'From', v(b.country));
+  if (ur && ub && (ur.WeighIn || ub.WeighIn)) h += row(ur.WeighIn ? `${ur.WeighIn} lb` : '–', 'Weigh-in', ub.WeighIn ? `${ub.WeighIn} lb` : '–');
+  const cr = r.st, cb = b.st;
+  if (cr.strikeLPM || cb.strikeLPM) {
+    h += `</table><div class="sub">UFC career averages</div><table>`;
+    h += row(v(cr.strikeLPM), 'Sig. strikes / min', v(cb.strikeLPM));
+    h += row(cr.strikeAccuracy ? `${Math.round(+cr.strikeAccuracy)}%` : '–', 'Strike accuracy', cb.strikeAccuracy ? `${Math.round(+cb.strikeAccuracy)}%` : '–');
+    h += row(v(cr.takedownAvg), 'Takedowns / 15 min', v(cb.takedownAvg));
+    h += row(cr.takedownAccuracy ? `${Math.round(+cr.takedownAccuracy)}%` : '–', 'Takedown accuracy', cb.takedownAccuracy ? `${Math.round(+cb.takedownAccuracy)}%` : '–');
+    h += row(v(cr.submissionAvg), 'Subs / 15 min', v(cb.submissionAvg));
+  }
+  h += '</table>';
+  if (f.state === 'post') {
+    const st = espnStats(f);
+    if (st) h += `<div class="sub">Fight stats</div>` + statsBlock(st, '').replace('class="stats"', 'class="stats" style="padding:4px 0 0"');
+  }
+  const links = [r.link && `<a href="${esc(r.link)}" target="_blank" rel="noopener">${esc(r.last)} on ESPN</a>`, b.link && `<a href="${esc(b.link)}" target="_blank" rel="noopener">${esc(b.last)} on ESPN</a>`].filter(Boolean).join(' · ');
+  if (f.ref || links) h += `<div class="sub" style="text-transform:none;letter-spacing:0">${f.ref ? 'Referee ' + esc(f.ref) + (links ? ' · ' : '') : ''}${links}</div>`;
+  return `<div class="tape">${h}</div>`;
+}
+
+function cardRow(f) {
+  let pill;
+  if (f.state === 'in') pill = `<span class="pill live">LIVE${f.u && f.u.round ? ' · R' + f.u.round : f.period ? ' · R' + f.period : ''}</span>`;
+  else if (f.state === 'post') pill = '<span class="pill fin">Final</span>';
+  else pill = `<span class="pill">${esc(fmtTime(f.start))}</span>`;
+  const line = (p, c, n) => {
+    const won = f.winner === n, lost = f.state === 'post' && f.winner && !won;
+    return `<div class="fl ${c}${lost ? ' lost' : ''}"><span class="c"></span><span class="n">${esc(p.name)}</span><span class="rc">${esc(p.rec)}</span>${won ? '<span class="w">WIN</span>' : '<span></span>'}</div>`;
+  };
+  const how = f.state === 'post' ? `<div class="how">${esc(methodText(f)) || '<span>Result to come</span>'}</div>` : '';
+  const open = S.open.has(f.key);
+  return `<div class="row"><button type="button" data-key="${esc(f.key)}" aria-expanded="${open}">
+    <div class="rtop"><span>${esc(f.weight)}${f.main ? ' · Main event' : f.title ? ' · Title' : ''}</span>${pill}</div>
+    ${line(f.red, 'r', 1)}${line(f.blue, 'b', 2)}${how}</button>${open ? tape(f) : ''}</div>`;
+}
+
+function renderCard(m) {
+  const segs = [];
+  for (const f of m.fights) { let s = segs.find(x => x.name === f.seg); if (!s) { s = { name: f.seg, fights: [] }; segs.push(s); } s.fights.push(f); }
+  const body = segs.map(s => `<div class="seghead">${esc(s.name)}<span>${esc(fmtTime(m.starts[s.name]))} UK</span></div>${s.fights.map(cardRow).join('')}`).join('');
+  return `<div class="h2"><h2>Full card</h2><span>Tap a fight for the tale of the tape</span></div><div class="list">${body}</div>`;
+}
+
+function renderEvent(m) {
+  const ev = m.fc.event, v = m.fc.venue;
+  const name = ev.name || '';
+  const parts = name.split(':');
+  const label = parts.length > 1 ? parts[0].trim() : 'UFC';
+  const title = parts.length > 1 ? parts.slice(1).join(':').trim() : name;
+  const place = (v && (v.displayNameLocation || (v.address && [v.address.city, v.address.country].filter(Boolean).join(', ')))) || '';
+  const anyLive = !!m.live;
+  const allDone = m.fights.every(f => f.state === 'post');
+  let status;
+  if (anyLive) status = '<span class="chip live"><b>LIVE</b></span>';
+  else if (allDone) status = '<span class="chip">Finished</span>';
+  else if (m.first > now()) status = `<span class="chip">Starts in <b class="num" data-until="${m.first}">${untilText(m.first)}</b></span>`;
+  else status = '<span class="chip">Between fights</span>';
+  const segs = Object.entries(m.starts).sort((a, b) => a[1] - b[1]).map(([n, t]) => `${esc(n)} <b>${esc(fmtTime(t))}</b>`).join(' · ');
+  const delay = S.delay ? `TV delay ${S.delay}s` : 'TV delay off';
+  return `<div class="eyebrow">${esc(label)} · ${esc(fmtDay(m.first))}${place ? ' · ' + esc(place) : ''}</div>
+  <h1>${esc(title)}</h1>
+  <div class="chips">${status}
+    <button type="button" class="chip" id="delayBtn" aria-pressed="${S.delay > 0}" title="Hold the live data back to match your TV stream">${delay}</button>
+    ${'wakeLock' in navigator ? `<button type="button" class="chip" id="wakeBtn" aria-pressed="${S.wakeOn}">${S.wakeOn ? 'Screen stays on' : 'Keep screen on'}</button>` : ''}
+  </div>
+  <div class="watch"><span class="tv">TNT Sports</span><span class="times">UK · ${segs}</span></div>`;
+}
+
+let lastHTML = {};
+function put(id, html) {
+  const el = document.getElementById(id);
+  // The ticking clock and countdowns update themselves; don't rebuild (and re-load photos) for them.
+  const key = html.replace(/(data-(?:clock|until)="[^"]*">)[^<]*/g, '$1');
+  if (lastHTML[id] === key) return;
+  lastHTML[id] = key;
+  el.innerHTML = html;
+  el.hidden = !html;
+}
+
+function render() {
+  const m = model();
+  renderFresh();
+  if (!m) {
+    if (S.errors.sb || S.errors.fc) put('err', `<div class="err">Can't reach ESPN right now (${esc(S.errors.fc || S.errors.sb)}). Trying again…</div>`);
+    return;
+  }
+  put('err', '');
+  put('event', renderEvent(m));
+  put('nowSec', renderNow(m));
+  put('nextSec', renderNext(m));
+  put('resSec', renderResults(m));
+  put('cardSec', renderCard(m));
+}
+
+function renderFresh() {
+  const el = $('#fresh'), tx = $('#freshText');
+  const at = Math.max(S.fc.length ? S.fc[S.fc.length - 1].at : 0, S.ufc.length ? S.ufc[S.ufc.length - 1].at : 0);
+  if (!at) { tx.textContent = S.errors.fc ? 'Offline' : 'Loading'; el.className = 'fresh' + (S.errors.fc ? ' warn' : ''); return; }
+  const age = Math.round((now() - at) / 1000);
+  tx.textContent = age < 5 ? 'Live' : age < 90 ? `Updated ${age}s ago` : `Updated ${Math.round(age / 60)}m ago`;
+  el.className = 'fresh ' + (age < 45 ? 'ok' : 'warn');
+}
+
+/* Second-by-second: the round clock and countdowns only. */
+function tick() {
+  const m = model();
+  if (m && m.live && m.live.u) {
+    const left = secondsLeft(m.live.u, viewNow());
+    document.querySelectorAll('[data-clock]').forEach(el => { if (left >= 0) el.textContent = mmss(left); });
+    if (left === 0) render();
+  }
+  document.querySelectorAll('[data-until]').forEach(el => { el.textContent = untilText(+el.dataset.until); });
+  renderFresh();
+  if (S.delay) render();
+}
+
+/* ---------- Loading ---------- */
+async function loadSb() {
+  try { S.sb = await getJSON(ESPN_SB); S.sbAt = now(); S.errors.sb = null; }
+  catch (e) { S.errors.sb = e.message || 'error'; }
+}
+function eventId() {
+  const q = new URLSearchParams(location.search).get('espn');
+  if (q) return q;
+  const evs = (S.sb && S.sb.events) || [];
+  return evs[0] && evs[0].id;
+}
+async function loadFc() {
+  const id = eventId();
+  if (!id) return;
+  try { const d = parseCenter(await getJSON(ESPN_FC(id))); push(S.fc, d); S.errors.fc = null; S.lastOk = now(); }
+  catch (e) { S.errors.fc = e.message || 'error'; }
+}
+function ufcMatchesEvent(u, fc) {
+  if (!u || !fc) return false;
+  const ev = fc.event || {};
+  if (norm(u.name) === norm(ev.name)) return true;
+  const start = Date.parse(ev.date);
+  if (u.start && start && Math.abs(u.start - start) > 36 * 3600e3) return false;
+  const me = fc.fights.find(f => f.main) || fc.fights[0];
+  return !!me && [me.red.last, me.blue.last].every(n => u.fights.some(f => same(f.red.Name && f.red.Name.LastName, n) || same(f.blue.Name && f.blue.Name.LastName, n)));
+}
+async function findUfc() {
+  const fcS = S.fc[S.fc.length - 1];
+  if (!fcS) return;
+  const id = String(fcS.data.event.id || eventId() || '');
+  const q = new URLSearchParams(location.search).get('ufc');
+  if (q) { S.ufcId = +q; return; }
+  const cached = lsGet('ufc:' + id) || UFC_SEED[id];
+  if (cached) { S.ufcId = +cached; return; }
+  if (S.scanAt && now() - S.scanAt < 10 * 60e3) return;
+  S.scanAt = now();
+  const base = +(lsGet('ufc:last') || UFC_KNOWN);
+  const ids = [];
+  for (let d = 0; d <= 22; d++) { ids.push(base + d); if (d && d <= 8) ids.push(base - d); }
+  for (let i = 0; i < ids.length; i += 6) {
+    const got = await Promise.all(ids.slice(i, i + 6).map(n => getJSON(`${UFC}/event/live/${n}.json`, 6000).then(parseUfc).catch(() => null)));
+    const hit = got.find(u => ufcMatchesEvent(u, fcS.data));
+    if (hit) { S.ufcId = hit.id; lsSet('ufc:' + id, hit.id); lsSet('ufc:last', hit.id); push(S.ufc, hit); return; }
+  }
+}
+async function loadUfc() {
+  if (!S.ufcId) { await findUfc(); if (!S.ufcId) return; }
+  try {
+    const u = parseUfc(await getJSON(`${UFC}/event/live/${S.ufcId}.json`, 6000));
+    if (u) { push(S.ufc, u); S.ufcFails = 0; }
+  } catch (e) { S.ufcFails++; }
+}
+async function loadStats() {
+  const m = model();
+  if (!m || !m.live || !m.live.u) return;
+  const u = m.live.u;
+  if (!u.round) return;
+  try {
+    const st = parseUfcStats(await getJSON(`${UFC}/fight/live/${u.id}.json`, 6000), u);
+    if (st) { S.ust[u.id] = S.ust[u.id] || []; push(S.ust[u.id], st); }
+  } catch (e) { /* ESPN's stats stand in */ }
+}
+
+function liveish() {
+  const s = S.fc[S.fc.length - 1];
+  if (!s) return false;
+  const fs = s.data.fights;
+  if (!fs.length) return false;
+  if (fs.some(f => f.state === 'in')) return true;
+  const first = Math.min(...fs.map(f => f.start));
+  const pending = fs.some(f => f.state !== 'post');
+  return pending && now() > first - 20 * 60e3 && now() < first + 12 * 3600e3;
+}
+
+const due = { sb: 0, fc: 0, ufc: 0, st: 0 };
+const busy = {};
+async function run(key, fn) {
+  if (busy[key]) return;
+  busy[key] = true;
+  try { await fn(); } finally { busy[key] = false; render(); }
+}
+function schedule(force) {
+  if (document.hidden && !force) return;
+  const t = now(), live = liveish();
+  const ufcOk = S.ufc.length && S.ufcFails === 0;
+  const iv = { sb: live ? 300e3 : 900e3, fc: live ? (ufcOk ? 20e3 : 10e3) : 120e3, ufc: live ? 5e3 : 0, st: live ? 10e3 : 0 };
+  if (force || t >= due.sb) { due.sb = t + iv.sb; run('sb', async () => { await loadSb(); await loadFc(); due.fc = now() + iv.fc; }); return; }
+  if (t >= due.fc) { due.fc = t + iv.fc; run('fc', loadFc); }
+  if (iv.ufc && t >= due.ufc) { due.ufc = t + (S.ufcFails > 3 ? 20e3 : iv.ufc); run('ufc', loadUfc); }
+  if (iv.st && t >= due.st) { due.st = t + iv.st; run('st', loadStats); }
+}
+
+/* ---------- Controls ---------- */
+document.addEventListener('click', async e => {
+  const row = e.target.closest('button[data-key]');
+  if (row) { const k = row.dataset.key; S.open.has(k) ? S.open.delete(k) : S.open.add(k); render(); return; }
+  if (e.target.closest('#fresh')) { due.fc = 0; due.ufc = 0; due.st = 0; schedule(true); return; }
+  if (e.target.closest('#delayBtn')) {
+    const i = DELAYS.indexOf(S.delay);
+    S.delay = DELAYS[(i + 1) % DELAYS.length];
+    lsSet('delay', S.delay); render(); return;
+  }
+  if (e.target.closest('#wakeBtn')) {
+    if (S.wakeOn) { S.wakeOn = false; try { S.wake && await S.wake.release(); } catch (x) {} S.wake = null; }
+    else { S.wakeOn = true; await getWake(); }
+    render();
+  }
+});
+async function getWake() {
+  if (!S.wakeOn || !('wakeLock' in navigator)) return;
+  try { S.wake = await navigator.wakeLock.request('screen'); S.wake.addEventListener('release', () => { S.wake = null; }); }
+  catch (e) { S.wakeOn = false; render(); }
+}
+document.addEventListener('visibilitychange', () => {
+  if (!document.hidden) { if (S.wakeOn && !S.wake) getWake(); due.fc = 0; due.ufc = 0; due.st = 0; schedule(); }
+});
+
+S.delay = DELAYS.includes(+lsGet('delay')) ? +lsGet('delay') : 0;
+schedule(true);
+setInterval(schedule, 1000);
+setInterval(tick, 1000);
+</script>
+</body>
+</html>
