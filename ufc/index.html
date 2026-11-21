@@ -51,6 +51,16 @@ button{font:inherit;color:inherit}
 
 /* Event header */
 .event{padding-block:18px 6px}
+/* Menu: tonight's details and the settings, tucked away so On now leads the page. */
+.menubtn{display:flex;flex-direction:column;justify-content:center;gap:4px;width:38px;height:36px;margin-right:-8px;padding:0 9px;background:none;border:0;cursor:pointer;touch-action:manipulation}
+.menubtn i{display:block;height:2px;border-radius:2px;background:var(--fg);transition:transform .2s,opacity .2s}
+.menubtn[aria-expanded="true"] i:nth-child(1){transform:translateY(6px) rotate(45deg)}
+.menubtn[aria-expanded="true"] i:nth-child(2){opacity:0}
+.menubtn[aria-expanded="true"] i:nth-child(3){transform:translateY(-6px) rotate(-45deg)}
+.menu{margin-top:12px;background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:0 14px 14px}
+.menu .event{padding-block:14px 0}
+.menu h1{font-size:28px}
+.menu .watch{background:var(--panel2)}
 .eyebrow{font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);font-weight:600}
 h1{font:800 34px/1 var(--display);letter-spacing:.01em;text-transform:uppercase;margin:6px 0 10px;text-wrap:balance}
 .chips{display:flex;flex-wrap:wrap;gap:8px}
@@ -210,11 +220,15 @@ footer{margin-top:26px;font-size:12px;color:var(--dim);line-height:1.6}
   <div class="wrap">
     <div class="brand"><i aria-hidden="true"></i>Cageside</div>
     <button class="fresh" id="fresh" type="button" title="Refresh now"><span class="dot"></span><span id="freshText">Loading</span></button>
+    <button class="menubtn" id="menuBtn" type="button" aria-label="Menu" aria-expanded="false" aria-controls="menu"><i></i><i></i><i></i></button>
   </div>
 </header>
 
 <main class="wrap">
-  <div id="event" class="event"><div class="eyebrow">UFC</div><h1>Loading the card…</h1></div>
+  <div id="menu" class="menu" hidden>
+    <div id="event" class="event"><div class="eyebrow">UFC</div><h1>Loading the card…</h1></div>
+    <div class="btns"><button type="button" class="btn ghost" id="menuDone">Done</button></div>
+  </div>
   <div id="err"></div>
   <section id="tvSec" hidden>
     <div class="h2"><h2>Watch</h2><span>Your IPTV, on this phone</span></div>
@@ -914,6 +928,7 @@ document.addEventListener('click', async e => {
   if (e.target.closest('#delayBtn')) { S.sync = { open: !S.sync.open, digits: '', msg: '' }; render(); return; }
   const key = e.target.closest('button[data-pad]');
   if (key) { padKey(key.dataset.pad); return; }
+  if (e.target.closest('#menuBtn') || e.target.closest('#menuDone')) { toggleMenu(); return; }
   if (e.target.closest('#alertBtn')) { S.alerts === 'on' ? turnOffAlerts() : turnOnAlerts(); return; }
   if (e.target.closest('#tvBtn')) { tvToggle(); return; }
   const ch = e.target.closest('button[data-ch]');
@@ -927,6 +942,12 @@ document.addEventListener('click', async e => {
     render();
   }
 });
+function toggleMenu(open = $('#menu').hidden) {
+  $('#menu').hidden = !open;
+  $('#menuBtn').setAttribute('aria-expanded', String(open));
+  if (open) window.scrollTo({ top: 0, behavior: 'smooth' });
+  else { S.sync.open = false; render(); }
+}
 async function getWake() {
   if (!S.wakeOn || !('wakeLock' in navigator)) return;
   try { S.wake = await navigator.wakeLock.request('screen'); S.wake.addEventListener('release', () => { S.wake = null; }); }
@@ -1247,6 +1268,7 @@ function tvToggle() {
   TV.open = !TV.open;
   if (!TV.open) tvStop();
   else if (!TV.login || TV.state !== 'list') { const s = tvSaved(); if (s) tvConnect(s); else { TV.state = 'login'; TV.msg = ''; } }
+  if (TV.open) toggleMenu(false);
   render(); renderTv();
   if (TV.open) $('#tvSec').scrollIntoView({ behavior: 'smooth', block: 'start' });
 }
