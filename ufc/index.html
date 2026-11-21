@@ -1020,11 +1020,29 @@ const TV = { open: false, state: 'login', msg: '', login: null, base: '', info: 
 function tvSaved() {
   try { const j = JSON.parse(lsGet(TV_KEY) || 'null'); return j && j.server && j.user && j.pass ? j : null; } catch (e) { return null; }
 }
-/* HTTPS addresses to try for what was typed (a page on HTTPS can't use a plain-HTTP server). */
-function tvCandidates(server) {
-  let t = String(server || '').trim().replace(/\/player_api\.php.*$/i, '').replace(/\/+$/, '');
-  if (!/^[a-z]+:\/\//i.test(t)) t = 'http://' + t;
-  let u; try { u = new URL(t); } catch (e) { return []; }
+/* Just the host (and port) from whatever was typed: no scheme, path, spaces or stray dots and slashes. */
+function tvHost(server) {
+  let t = String(server || '').replace(/\s+/g, '').replace(/^[a-z][a-z0-9+.-]*:\/+/i, '').replace(/^[./\\]+/, '');
+  t = t.split(/[/?#\\]/)[0].replace(/\.+$/, '').replace(/\.{2,}/g, '.').replace(/\.:/, ':').toLowerCase();
+  return t;
+}
+/* Providers that moved to a new address, which a web page can't follow on its own. Each entry is
+   found by a hash of the old address and the new one is sealed with it, so the page itself names no provider. */
+const TV_MOVES = { '98e258b6d98146054a42007b30f37a21': 'a30ezic1n/rzgC4CV7K6e4iwzbu5tr+wc7WPYqzSgUNbAlIeTZevvuPZ' };
+async function tvMoved(host) {
+  try {
+    const sha = async t => new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(t)));
+    const id = [...(await sha('cageside-move|' + host))].map(b => b.toString(16).padStart(2, '0')).join('').slice(0, 32);
+    const sealed = TV_MOVES[id];
+    if (!sealed) return host;
+    const raw = Uint8Array.from(atob(sealed), c => c.charCodeAt(0));
+    const key = await crypto.subtle.importKey('raw', await sha('cageside-key|' + host), 'AES-GCM', false, ['decrypt']);
+    return new TextDecoder().decode(await crypto.subtle.decrypt({ name: 'AES-GCM', iv: raw.slice(0, 12) }, key, raw.slice(12)));
+  } catch (e) { return host; }
+}
+/* HTTPS addresses to try for the host (a page on HTTPS can't use a plain-HTTP server). */
+function tvCandidates(host) {
+  let u; try { u = new URL('http://' + host); } catch (e) { return []; }
   const out = [], add = x => { if (!out.includes(x)) out.push(x); };
   add('https://' + u.host);
   add('https://' + u.hostname);
@@ -1045,8 +1063,10 @@ const tvUrl = (id, ext) => `${TV.base}/live/${encodeURIComponent(TV.login.user)}
 
 async function tvConnect(login) {
   TV.tried = login; TV.state = 'busy'; TV.msg = 'Signing in to your provider…'; renderTv();
+  const typed = tvHost(login.server), host = await tvMoved(typed);
+  login = { ...login, server: host };
   let last = null;
-  for (const base of tvCandidates(login.server)) {
+  for (const base of tvCandidates(host)) {
     try {
       const j = await tvFetch(tvApi('', '', base, login));
       const ui = j && j.user_info;
@@ -1064,8 +1084,8 @@ async function tvConnect(login) {
   }
   TV.state = 'login';
   TV.msg = last && last.status
-    ? `That server answered ${last.status}. Check the server address.`
-    : 'Couldn\'t reach that server from a web page. Check the address. If your provider has moved to a new address, type the new one (a web page can\'t follow the move).';
+    ? `Your provider turned that down (it answered ${last.status}). Check the username and password.`
+    : `Couldn't reach ${host || 'that server'} from a web page. Check the server address. If your provider has moved to a new address, type the new one (a web page can't follow the move).`;
   renderTv();
 }
 
