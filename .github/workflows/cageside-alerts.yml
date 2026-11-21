@@ -1,4 +1,6 @@
-# Cageside alerts: lock-screen notifications (ntfy topic cageside-ufc-7rk2) while a UFC card is on.
+# Cageside alerts: lock-screen notifications (ntfy topic cageside-ufc-7rk2) while a UFC card is on,
+# plus alerts straight to Cageside on the phone (Web Push) when the CAGESIDE_VAPID_KEY secret is set.
+# The phones that turned alerts on are kept in the Actions cache from one run to the next.
 # Checks every two hours on Saturdays and Sundays (UK and US cards both land then); a run leaves at
 # once when no card is on or close, follows the card to its end otherwise, and a queued run carries on
 # if one hits its time limit. Run it by hand from the Actions tab for a card on another day.
@@ -18,9 +20,29 @@ jobs:
       - uses: actions/checkout@v4
         with:
           sparse-checkout: ufc
+      - name: Phones that turned alerts on
+        uses: actions/cache/restore@v4
+        with:
+          path: .cageside-subs.json
+          key: cageside-subs-${{ github.run_id }}
+          restore-keys: cageside-subs-
       - name: Follow the card and send alerts
-        run: python3 ufc/alerts.py
+        run: |
+          if [ -n "$VAPID_PEM" ]; then
+            python3 -c "import cryptography" 2>/dev/null || python3 -m pip install --quiet --break-system-packages cryptography
+            printf '%s\n' "$VAPID_PEM" > "$RUNNER_TEMP/vapid.pem"
+            export CAGESIDE_VAPID_KEY="$RUNNER_TEMP/vapid.pem"
+          fi
+          python3 ufc/alerts.py
         env:
+          VAPID_PEM: ${{ secrets.CAGESIDE_VAPID_KEY }}
           CAGESIDE_TOPIC: cageside-ufc-7rk2
           CAGESIDE_MAX_HOURS: "5.6"
           CAGESIDE_STATE: ${{ runner.temp }}/cageside-state.json
+          CAGESIDE_SUBS: .cageside-subs.json
+      - name: Keep the phone list for the next run
+        if: always() && hashFiles('.cageside-subs.json') != ''
+        uses: actions/cache/save@v4
+        with:
+          path: .cageside-subs.json
+          key: cageside-subs-${{ github.run_id }}-${{ github.run_attempt }}
