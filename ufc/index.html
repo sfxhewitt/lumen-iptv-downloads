@@ -163,6 +163,27 @@ section{margin-top:22px}
 .seghead span{font-family:var(--body);letter-spacing:0;text-transform:none;font-weight:500;font-size:12.5px}
 .note{margin-top:10px;font-size:13px;color:var(--gold);line-height:1.4}
 .err{margin-top:14px;padding:12px 14px;border-radius:12px;border:1px solid rgba(242,184,75,.4);background:rgba(242,184,75,.08);color:var(--gold);font-size:13.5px}
+#tvSec{scroll-margin-top:72px}
+.tvbox{background:var(--panel);border:1px solid var(--line);border-radius:16px;overflow:hidden}
+.player{background:#000}
+.player video{display:block;width:100%;aspect-ratio:16/9;background:#000}
+.tvpad{padding:12px 14px 14px}
+.tvpad label{display:block;font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin:10px 0 4px}
+.tvpad input{width:100%;font:16px/1.3 var(--body);color:var(--fg);background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:10px 12px;outline:none}
+.tvpad input:focus{border-color:var(--blue)}
+.btns{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px}
+.btn{display:inline-flex;align-items:center;justify-content:center;border:1px solid transparent;border-radius:10px;padding:9px 14px;font-weight:600;font-size:14px;background:var(--red);color:#fff;cursor:pointer;text-decoration:none;touch-action:manipulation}
+.btn.ghost{background:var(--panel2);color:var(--fg);border-color:var(--line)}
+.btn:disabled{opacity:.5}
+.tvstat{display:flex;justify-content:space-between;align-items:baseline;gap:10px;font-size:13px;color:var(--muted)}
+.tvstat b{color:var(--fg);font-weight:600}
+.linkbtn{background:none;border:0;padding:0;color:var(--muted);font-size:12.5px;text-decoration:underline;cursor:pointer}
+.chans{margin-top:8px}
+.chan{display:flex;justify-content:space-between;align-items:center;gap:10px;width:100%;text-align:left;background:none;border:0;border-top:1px solid var(--line);padding:11px 2px;cursor:pointer;touch-action:manipulation}
+.chan span{font-weight:600}
+.chan small{color:var(--dim);font-size:11.5px;text-align:right}
+.chan.on span{color:var(--gold)}
+.tvnote{font-size:12.5px;color:var(--muted);margin-top:12px;line-height:1.45}
 footer{margin-top:26px;font-size:12px;color:var(--dim);line-height:1.6}
 .skeleton{height:220px;border-radius:18px;background:linear-gradient(90deg,var(--panel) 0%,var(--panel2) 50%,var(--panel) 100%);background-size:200% 100%;animation:sh 1.4s infinite}
 @keyframes sh{to{background-position:-200% 0}}
@@ -181,6 +202,13 @@ footer{margin-top:26px;font-size:12px;color:var(--dim);line-height:1.6}
 <main class="wrap">
   <div id="event" class="event"><div class="eyebrow">UFC</div><h1>Loading the card…</h1></div>
   <div id="err"></div>
+  <section id="tvSec" hidden>
+    <div class="h2"><h2>Watch</h2><span>Your IPTV, on this phone</span></div>
+    <div class="tvbox">
+      <div class="player" id="tvPlayer" hidden><video id="tvVid" playsinline controls preload="none"></video></div>
+      <div class="tvpad" id="tvPanel"></div>
+    </div>
+  </section>
   <section id="nowSec"><div class="h2"><h2>On now</h2></div><div class="skeleton"></div></section>
   <section id="nextSec" hidden></section>
   <section id="resSec" hidden></section>
@@ -649,6 +677,7 @@ function renderEvent(m) {
   <div class="chips">${status}
     <button type="button" class="chip" id="delayBtn" aria-pressed="${S.delay > 0}" title="Hold the live data back to match your TV stream">${delay}</button>
     ${'wakeLock' in navigator ? `<button type="button" class="chip" id="wakeBtn" aria-pressed="${S.wakeOn}">${S.wakeOn ? 'Screen stays on' : 'Keep screen on'}</button>` : ''}
+    <button type="button" class="chip" id="tvBtn" aria-pressed="${TV.open}">${TV.open ? 'Hide player' : 'Watch'}</button>
     <button type="button" class="chip" id="alertBtn" aria-pressed="${S.alerts === 'on'}">${S.alerts === 'on' ? 'Alerts on' : 'Turn on alerts'}</button>
   </div>
   ${S.alertMsg ? `<div class="note">${esc(S.alertMsg)}</div>` : ''}
@@ -806,6 +835,12 @@ document.addEventListener('click', async e => {
     lsSet('delay', S.delay); render(); return;
   }
   if (e.target.closest('#alertBtn')) { turnOnAlerts(); return; }
+  if (e.target.closest('#tvBtn')) { tvToggle(); return; }
+  const ch = e.target.closest('button[data-ch]');
+  if (ch) { tvPlay(ch.dataset.ch); return; }
+  if (e.target.closest('#tvStop')) { tvStop(); return; }
+  if (e.target.closest('#tvAll')) { tvLoadChannels(true); return; }
+  if (e.target.closest('#tvForget')) { tvForget(); return; }
   if (e.target.closest('#wakeBtn')) {
     if (S.wakeOn) { S.wakeOn = false; try { S.wake && await S.wake.release(); } catch (x) {} S.wake = null; }
     else { S.wakeOn = true; await getWake(); }
@@ -873,6 +908,201 @@ async function bootAlerts() {
     if (now() - (+lsGet('subPostedAt') || 0) > 6 * 3600e3) await sendSub(sub);
   } catch (x) { /* alerts stay as they were */ }
 }
+
+/* ---------- Watch: the user's own IPTV login (Xtream Codes) ----------
+   Nothing about the login is in this page. The user types it in; it is kept only in this Home Screen
+   app's own storage on the phone (never in a Safari tab, where other pages on this site could read it),
+   and it is only ever sent to the provider's own server, over HTTPS. */
+const TV_KEY = 'tvLogin';
+const TV = { open: false, state: 'login', msg: '', login: null, base: '', info: null, hls: true, chans: [], all: false, q: 'TNT Sport', playing: null, playMsg: '', slow: 0 };
+
+function tvSaved() {
+  try { const j = JSON.parse(lsGet(TV_KEY) || 'null'); return j && j.server && j.user && j.pass ? j : null; } catch (e) { return null; }
+}
+/* HTTPS addresses to try for what was typed (a page on HTTPS can't use a plain-HTTP server). */
+function tvCandidates(server) {
+  let t = String(server || '').trim().replace(/\/player_api\.php.*$/i, '').replace(/\/+$/, '');
+  if (!/^[a-z]+:\/\//i.test(t)) t = 'http://' + t;
+  let u; try { u = new URL(t); } catch (e) { return []; }
+  const out = [], add = x => { if (!out.includes(x)) out.push(x); };
+  add('https://' + u.host);
+  add('https://' + u.hostname);
+  if (location.protocol === 'http:') add('http://' + u.host); // local testing only
+  return out;
+}
+async function tvFetch(url, ms = 15000) {
+  const ac = new AbortController(), timer = setTimeout(() => ac.abort(), ms);
+  try {
+    const r = await fetch(url, { signal: ac.signal, cache: 'no-store', credentials: 'omit', referrerPolicy: 'no-referrer' });
+    if (!r.ok) { const e = new Error('HTTP ' + r.status); e.status = r.status; throw e; }
+    return await r.json();
+  } finally { clearTimeout(timer); }
+}
+const tvApi = (action, extra = '', base = TV.base, l = TV.login) =>
+  `${base}/player_api.php?username=${encodeURIComponent(l.user)}&password=${encodeURIComponent(l.pass)}${action ? '&action=' + action : ''}${extra}`;
+const tvUrl = (id, ext) => `${TV.base}/live/${encodeURIComponent(TV.login.user)}/${encodeURIComponent(TV.login.pass)}/${id}.${ext || (TV.hls ? 'm3u8' : 'ts')}`;
+
+async function tvConnect(login) {
+  TV.tried = login; TV.state = 'busy'; TV.msg = 'Signing in to your provider…'; renderTv();
+  let last = null;
+  for (const base of tvCandidates(login.server)) {
+    try {
+      const j = await tvFetch(tvApi('', '', base, login));
+      const ui = j && j.user_info;
+      if (!ui) throw new Error('not an IPTV server');
+      TV.state = 'login';
+      if (String(ui.auth) !== '1') { TV.msg = 'Your provider didn\'t accept that username and password.'; renderTv(); return; }
+      if (ui.status && ui.status !== 'Active') { TV.msg = `Your provider says this account is ${ui.status}.`; renderTv(); return; }
+      const fmts = Array.isArray(ui.allowed_output_formats) ? ui.allowed_output_formats : [];
+      TV.hls = !fmts.length || fmts.includes('m3u8');
+      TV.base = base; TV.login = login; TV.info = ui;
+      if (standalone()) lsSet(TV_KEY, JSON.stringify(login));
+      await tvLoadChannels(false);
+      return;
+    } catch (e) { last = e; }
+  }
+  TV.state = 'login';
+  TV.msg = last && last.status
+    ? `That server answered ${last.status}. Check the server address.`
+    : 'Couldn\'t reach that server from a web page. Check the address. If your provider has moved to a new address, type the new one (a web page can\'t follow the move).';
+  renderTv();
+}
+
+async function tvLoadChannels(all) {
+  TV.state = 'busy'; TV.msg = all ? 'Loading every channel. This can take a moment…' : 'Finding the sports channels…'; renderTv();
+  try {
+    const cats = await tvFetch(tvApi('get_live_categories'));
+    const catName = {};
+    (Array.isArray(cats) ? cats : []).forEach(c => { catName[c.category_id] = String(c.category_name || ''); });
+    let streams = [];
+    if (all) streams = await tvFetch(tvApi('get_live_streams'), 90000);
+    else {
+      const pick = (Array.isArray(cats) ? cats : []).filter(c => /sport|tnt|ufc|ppv|fight|mma|box/i.test(c.category_name || '')).slice(0, 30);
+      if (!pick.length) return tvLoadChannels(true);
+      for (let i = 0; i < pick.length; i += 5) {
+        const part = await Promise.all(pick.slice(i, i + 5).map(c => tvFetch(tvApi('get_live_streams', '&category_id=' + encodeURIComponent(c.category_id))).catch(() => [])));
+        part.forEach(a => { if (Array.isArray(a)) streams.push(...a); });
+      }
+    }
+    const seen = new Set();
+    TV.chans = (Array.isArray(streams) ? streams : []).filter(x => x && x.stream_id != null && !seen.has(String(x.stream_id)) && seen.add(String(x.stream_id)))
+      .map(x => ({ id: String(x.stream_id), name: String(x.name || '').trim(), cat: catName[x.category_id] || '' }));
+    TV.all = !!all; TV.msg = TV.chans.length ? '' : 'Your provider sent no channels for this.';
+  } catch (e) {
+    TV.msg = `Couldn't load the channel list (${e.status ? 'HTTP ' + e.status : 'no answer'}). Tap Watch again to retry.`;
+  }
+  TV.state = 'list'; renderTv();
+}
+
+function tvMatches() {
+  const words = TV.q.toLowerCase().split(/\s+/).filter(Boolean);
+  const uk = c => /\b(uk|gb)\b|united kingdom/i.test(c.name + ' ' + c.cat) ? 0 : 1;
+  return TV.chans.filter(c => { const h = (c.name + ' ' + c.cat).toLowerCase(); return words.every(w => h.includes(w)); })
+    .sort((a, b) => uk(a) - uk(b) || a.name.localeCompare(b.name, 'en', { numeric: true })).slice(0, 60);
+}
+
+function renderTv() {
+  $('#tvSec').hidden = !TV.open;
+  if (!TV.open) return;
+  const p = $('#tvPanel');
+  const msg = TV.msg ? `<div class="note">${esc(TV.msg)}</div>` : '';
+  if (TV.state === 'busy') { p.innerHTML = `<div class="tvstat"><span>${esc(TV.msg)}</span></div>`; return; }
+  if (TV.state === 'login') {
+    const s = TV.tried || tvSaved() || {};
+    p.innerHTML = `<form id="tvForm" autocomplete="on">
+      <label for="tvServer">Server</label><input id="tvServer" name="url" inputmode="url" autocapitalize="off" autocorrect="off" spellcheck="false" placeholder="your provider's address" value="${esc(s.server || '')}">
+      <label for="tvUser">Username</label><input id="tvUser" name="username" autocomplete="username" autocapitalize="off" autocorrect="off" spellcheck="false" value="${esc(s.user || '')}">
+      <label for="tvPass">Password</label><input id="tvPass" name="password" type="password" autocomplete="current-password" value="${esc(s.pass || '')}">
+      <div class="btns"><button class="btn" type="submit">Sign in</button></div>
+    </form>${msg}
+    <div class="tvnote">The same IPTV login as LUMEN. ${standalone()
+      ? 'It stays on this iPhone, in Cageside\'s own storage, and only ever goes to your provider.'
+      : 'In a browser tab it isn\'t saved. Open Cageside from your Home Screen to have this iPhone remember it.'}</div>`;
+    return;
+  }
+  p.innerHTML = `<div id="tvStatus"></div>
+    <label for="tvQ">Channels</label><input id="tvQ" type="search" autocapitalize="off" autocorrect="off" spellcheck="false" value="${esc(TV.q)}" placeholder="Search channels">
+    ${msg}<div class="chans" id="tvList"></div>
+    <div class="btns">${TV.all ? '' : '<button class="btn ghost" type="button" id="tvAll">Search every channel</button>'}</div>`;
+  renderTvStatus(); renderTvList();
+}
+function renderTvStatus() {
+  const el = $('#tvStatus'); if (!el) return;
+  if (TV.playing) {
+    const vlc = 'vlc-x-callback://x-callback-url/stream?url=' + encodeURIComponent(tvUrl(TV.playing.id));
+    el.innerHTML = `<div class="tvstat"><span>Playing <b>${esc(TV.playing.name)}</b></span></div>
+      ${TV.playMsg ? `<div class="note">${esc(TV.playMsg)}</div>` : ''}
+      <div class="btns"><button class="btn" type="button" id="tvStop">Stop</button><a class="btn ghost" href="${esc(vlc)}">Open in VLC</a></div>`;
+    return;
+  }
+  const ui = TV.info || {};
+  const cons = ui.max_connections ? ` · ${esc(ui.active_cons ?? '?')} of ${esc(ui.max_connections)} streams in use` : '';
+  el.innerHTML = `<div class="tvstat"><span>Signed in${cons}</span><button class="linkbtn" type="button" id="tvForget">Forget login</button></div>
+    ${TV.hls ? '' : '<div class="note">Your account doesn\'t offer the stream type the iPhone plays in a page, so channels open in VLC instead.</div>'}`;
+}
+function renderTvList() {
+  const el = $('#tvList'); if (!el) return;
+  const list = tvMatches();
+  el.innerHTML = list.length
+    ? list.map(c => TV.hls
+        ? `<button type="button" class="chan${TV.playing && TV.playing.id === c.id ? ' on' : ''}" data-ch="${esc(c.id)}"><span>${esc(c.name)}</span><small>${esc(c.cat)}</small></button>`
+        : `<a class="chan" href="${esc('vlc-x-callback://x-callback-url/stream?url=' + encodeURIComponent(tvUrl(c.id, 'ts')))}"><span>${esc(c.name)}</span><small>${esc(c.cat)}</small></a>`).join('')
+    : `<div class="tvnote">${TV.chans.length ? 'No channel matches that.' + (TV.all ? '' : ' Try Search every channel.') : ''}</div>`;
+}
+
+function tvToggle() {
+  TV.open = !TV.open;
+  if (!TV.open) tvStop();
+  else if (!TV.login || TV.state !== 'list') { const s = tvSaved(); if (s) tvConnect(s); else { TV.state = 'login'; TV.msg = ''; } }
+  render(); renderTv();
+  if (TV.open) $('#tvSec').scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+function tvPlay(id) {
+  const c = TV.chans.find(x => x.id === id), v = $('#tvVid');
+  if (!c || !v) return;
+  TV.playing = c; TV.playMsg = `Starting ${c.name}…`;
+  $('#tvPlayer').hidden = false;
+  v.src = tvUrl(id);
+  const pr = v.play(); if (pr) pr.catch(() => {});
+  clearTimeout(TV.slow);
+  TV.slow = setTimeout(() => {
+    if (TV.playing === c && (v.paused || v.readyState < 3)) { TV.playMsg = 'Still not playing. Try another channel, or Open in VLC.'; renderTvStatus(); }
+  }, 20000);
+  renderTvStatus(); renderTvList();
+  $('#tvSec').scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+function tvStop() {
+  const v = $('#tvVid');
+  clearTimeout(TV.slow);
+  if (v) { v.pause(); v.removeAttribute('src'); v.load(); }
+  TV.playing = null; TV.playMsg = '';
+  $('#tvPlayer').hidden = true;
+  renderTvStatus(); renderTvList();
+}
+function tvForget() {
+  tvStop();
+  try { localStorage.removeItem(TV_KEY); } catch (e) {}
+  Object.assign(TV, { state: 'login', msg: 'Login forgotten on this phone.', login: null, tried: null, base: '', info: null, chans: [], all: false });
+  renderTv();
+}
+(function () {
+  const v = $('#tvVid');
+  v.addEventListener('playing', () => { if (TV.playing) { TV.playMsg = ''; renderTvStatus(); } });
+  v.addEventListener('error', () => {
+    if (!TV.playing || !v.getAttribute('src')) return;
+    TV.playMsg = `That channel wouldn't play here (error ${v.error ? v.error.code : '?'}). Try another, or Open in VLC.`;
+    renderTvStatus();
+  });
+})();
+document.addEventListener('submit', e => {
+  if (e.target.id !== 'tvForm') return;
+  e.preventDefault();
+  const login = { server: $('#tvServer').value.trim(), user: $('#tvUser').value.trim(), pass: $('#tvPass').value };
+  if (!login.server || !login.user || !login.pass) { TV.msg = 'Fill in the server, username and password.'; renderTv(); return; }
+  if (document.activeElement) document.activeElement.blur();
+  tvConnect(login);
+});
+document.addEventListener('input', e => { if (e.target.id === 'tvQ') { TV.q = e.target.value; renderTvList(); } });
 
 S.alerts = 'off'; S.alertMsg = '';
 bootAlerts();
