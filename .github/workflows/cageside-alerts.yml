@@ -1,13 +1,15 @@
 # Cageside alerts: lock-screen notifications (ntfy topic cageside-ufc-7rk2) while a UFC card is on,
 # plus alerts straight to Cageside on the phone (Web Push) when the CAGESIDE_VAPID_KEY secret is set.
 # The phones that turned alerts on are kept in the Actions cache from one run to the next.
-# Checks every two hours on Saturdays and Sundays (UK and US cards both land then); a run leaves at
+# Checks every half hour on Saturdays and Sundays (UK and US cards both land then), away from the top
+# of the hour because GitHub drops scheduled runs there when it's busy (most of the two-hourly ":05"
+# runs on 21-22 Nov never started); a run leaves at
 # once when no card is on or close, follows the card to its end otherwise, and a queued run carries on
 # if one hits its time limit. Run it by hand from the Actions tab for a card on another day.
 name: Cageside alerts
 on:
   schedule:
-    - cron: "5 */2 * * 6,0"
+    - cron: "17,47 * * * 6,0"
   workflow_dispatch:
 concurrency:
   group: cageside-alerts
