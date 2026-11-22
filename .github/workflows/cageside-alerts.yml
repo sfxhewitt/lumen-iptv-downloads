@@ -1,19 +1,21 @@
 # Cageside alerts: lock-screen notifications (ntfy topic cageside-ufc-7rk2) while a UFC card is on,
 # plus alerts straight to Cageside on the phone (Web Push) when the CAGESIDE_VAPID_KEY secret is set.
-# The phones that turned alerts on are kept in the Actions cache from one run to the next.
-# Checks every half hour on Saturdays and Sundays (UK and US cards both land then), away from the top
-# of the hour because GitHub drops scheduled runs there when it's busy (most of the two-hourly ":05"
-# runs on 21-22 Nov never started); a run leaves at
-# once when no card is on or close, follows the card to its end otherwise, and a queued run carries on
-# if one hits its time limit. Run it by hand from the Actions tab for a card on another day.
+# GitHub's schedule is patchy (on 21-22 Nov only 2 of roughly 18 scheduled runs started), so it asks
+# often, from Friday to Sunday, and one run that does start is enough: with a card due within 24 hours
+# it waits for it, follows it to the end, and hands over to a fresh run (workflow_dispatch) whenever it
+# nears its time limit. The phones that turned alerts on and what's been sent so far are kept in the
+# Actions cache between runs. Run it by hand from the Actions tab for a card on another day.
 name: Cageside alerts
 on:
   schedule:
-    - cron: "17,47 * * * 6,0"
+    - cron: "17,47 * * * 5,6,0"
   workflow_dispatch:
 concurrency:
   group: cageside-alerts
   cancel-in-progress: false
+permissions:
+  contents: read
+  actions: write
 jobs:
   alerts:
     runs-on: ubuntu-latest
@@ -22,14 +24,16 @@ jobs:
       - uses: actions/checkout@v4
         with:
           sparse-checkout: ufc
-      - name: Phones that turned alerts on
+      - name: Phones that turned alerts on, and what's been sent
         uses: actions/cache/restore@v4
         with:
-          path: .cageside-subs.json
-          key: cageside-subs-${{ github.run_id }}
-          restore-keys: cageside-subs-
+          path: .cageside
+          key: cageside-data-${{ github.run_id }}
+          restore-keys: cageside-data-
       - name: Follow the card and send alerts
+        id: follow
         run: |
+          mkdir -p .cageside
           if [ -n "$VAPID_PEM" ]; then
             python3 -c "import cryptography" 2>/dev/null || python3 -m pip install --quiet --break-system-packages cryptography
             printf '%s\n' "$VAPID_PEM" > "$RUNNER_TEMP/vapid.pem"
@@ -40,11 +44,16 @@ jobs:
           VAPID_PEM: ${{ secrets.CAGESIDE_VAPID_KEY }}
           CAGESIDE_TOPIC: cageside-ufc-7rk2
           CAGESIDE_MAX_HOURS: "5.6"
-          CAGESIDE_STATE: ${{ runner.temp }}/cageside-state.json
-          CAGESIDE_SUBS: .cageside-subs.json
-      - name: Keep the phone list for the next run
-        if: always() && hashFiles('.cageside-subs.json') != ''
+          CAGESIDE_STATE: .cageside/state.json
+          CAGESIDE_SUBS: .cageside/subs.json
+      - name: Keep them for the next run
+        if: always() && hashFiles('.cageside/*.json') != ''
         uses: actions/cache/save@v4
         with:
-          path: .cageside-subs.json
-          key: cageside-subs-${{ github.run_id }}-${{ github.run_attempt }}
+          path: .cageside
+          key: cageside-data-${{ github.run_id }}-${{ github.run_attempt }}
+      - name: Hand over to a fresh run (the card is still to come or still on)
+        if: steps.follow.outputs.handoff == '1'
+        run: gh workflow run cageside-alerts.yml --repo "$GITHUB_REPOSITORY" --ref "$GITHUB_REF_NAME"
+        env:
+          GH_TOKEN: ${{ github.token }}

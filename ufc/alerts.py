@@ -23,8 +23,10 @@ from datetime import datetime, timezone
 TOPIC = os.environ.get("CAGESIDE_TOPIC", "cageside-ufc-7rk2")  # empty: no ntfy
 STATE_FILE = os.environ.get("CAGESIDE_STATE", "cageside-alerts-state.json")
 MAX_HOURS = float(os.environ.get("CAGESIDE_MAX_HOURS", "8"))
-# Leave straight away when nothing is on and the first fight is further off than this.
+# Start following this long before the first fight. A card further off than WAIT_HOURS: leave at once;
+# nearer than that: wait for it (GitHub's schedule is too patchy to count on a run near the card).
 LEAD_HOURS = float(os.environ.get("CAGESIDE_LEAD_HOURS", "2.5"))
+WAIT_HOURS = float(os.environ.get("CAGESIDE_WAIT_HOURS", "24"))
 APP = "https://is.gd/cagesideufc"
 ESPN_SB = "https://site.api.espn.com/apis/site/v2/sports/mma/ufc/scoreboard"
 ESPN_FC = "https://site.web.api.espn.com/apis/common/v3/sports/mma/ufc/fightcenter/{}?region=gb&lang=en"
@@ -353,6 +355,14 @@ def ufc_knockdowns(u, flip):
 
 
 # ---------- the loop ----------
+def hand_off():
+    """Out of time with the card still to come or still on: ask the workflow for a fresh run."""
+    out = os.environ.get("GITHUB_OUTPUT")
+    if out:
+        with open(out, "a") as fh:
+            fh.write("handoff=1\n")
+
+
 def load_state():
     try:
         with open(STATE_FILE) as fh:
@@ -465,6 +475,12 @@ def main():
             first = min((f["start"] for f in fights), default=0)
             on_now = any(f["state"] == "in" for f in fights)
             if not on_now and (not first or first - now_ms > LEAD_HOURS * 3600e3 or all(f["state"] == "post" for f in fights)):
+                wait = (first - now_ms) / 1000 - LEAD_HOURS * 3600
+                if first and wait <= (WAIT_HOURS - LEAD_HOURS) * 3600 and not all(f["state"] == "post" for f in fights):
+                    left = MAX_HOURS * 3600 - (time.time() - began)
+                    log("first fight", uk_time(first), "- waiting", round(min(wait, left) / 60), "min")
+                    time.sleep(max(1, min(wait, left)))
+                    continue
                 log("nothing on: first fight", uk_time(first) if first else "unknown", "- leaving")
                 return
             # First look: everything already true is old news.
@@ -479,15 +495,25 @@ def main():
                     continue
                 if notify(title, msg, tags, pr):
                     sent.add(key)
+        card_over = bool(fights) and all(f["state"] == "post" for f in fights)
+        if card_over:
+            state.setdefault("over_at", now_ms)
         state["sent"] = sorted(sent)
         save_state(state)
 
-        if fights and all(f["state"] == "post" for f in fights) and all(f"{f['id']}:result" in sent for f in fights):
+        # Finished: every result sent, or the card over for half an hour (a result with nothing to say).
+        if card_over and (all(f"{f['id']}:result" in sent for f in fights) or now_ms - state["over_at"] > 1800e3):
             log("card finished")
+            return
+        # A backstop so runs never keep handing over: no card lasts 12 hours past its first fight.
+        starts = [f["start"] for f in fights if f["start"]]
+        if starts and now_ms - min(starts) > 12 * 3600e3:
+            log("card should be over by now - leaving")
             return
         live_now = any(f["state"] == "in" for f in fights) or any(ufc_state(u) == "on" for u in ufs)
         time.sleep(12 if live_now else 30)
-    log("stopped after", MAX_HOURS, "hours")
+    log("stopped after", MAX_HOURS, "hours - handing over to a fresh run")
+    hand_off()
 
 
 if __name__ == "__main__":
