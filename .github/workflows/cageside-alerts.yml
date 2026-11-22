@@ -40,6 +40,9 @@ jobs:
             export CAGESIDE_VAPID_KEY="$RUNNER_TEMP/vapid.pem"
           fi
           python3 ufc/alerts.py
+          echo '{"test": 1}' > .cageside/test.json
+          echo "actor=$GITHUB_ACTOR"; ls -la .cageside
+          if [ "$GITHUB_ACTOR" != "github-actions[bot]" ]; then echo "handoff=1" >> "$GITHUB_OUTPUT"; fi
         env:
           VAPID_PEM: ${{ secrets.CAGESIDE_VAPID_KEY }}
           CAGESIDE_TOPIC: cageside-ufc-7rk2
