@@ -1,0 +1,236 @@
+<!doctype html>
+<html lang="en-GB">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>LUMEN Installs</title>
+<meta name="description" content="How many TVs have LUMEN and whether they're on the latest version.">
+<meta name="robots" content="noindex">
+<meta name="theme-color" content="#000000" media="(prefers-color-scheme: dark)">
+<meta name="theme-color" content="#f2f2f7" media="(prefers-color-scheme: light)">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="Installs">
+<link rel="apple-touch-icon" href="icon-180.png">
+<link rel="icon" type="image/png" href="icon-180.png">
+<style>
+/* iOS grouped-list look: summary tiles, then versions, then every TV, newest first. */
+:root{
+  --bg:#f2f2f7; --cell:#ffffff; --sep:rgba(60,60,67,.18); --fg:#000; --muted:rgba(60,60,67,.6); --dim:rgba(60,60,67,.3);
+  --green:#34c759; --orange:#ff9500; --blue:#007aff; --red:#ff3b30; --track:rgba(120,120,128,.16);
+  --green-soft:rgba(52,199,89,.14); --orange-soft:rgba(255,149,0,.14);
+  color-scheme:light dark;
+}
+@media (prefers-color-scheme: dark){
+  :root{
+    --bg:#000; --cell:#1c1c1e; --sep:rgba(84,84,88,.6); --fg:#fff; --muted:rgba(235,235,245,.6); --dim:rgba(235,235,245,.3);
+    --green:#30d158; --orange:#ff9f0a; --blue:#0a84ff; --red:#ff453a; --track:rgba(120,120,128,.32);
+    --green-soft:rgba(48,209,88,.16); --orange-soft:rgba(255,159,10,.16);
+  }
+}
+*{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%;background:var(--bg)}
+body{margin:0;background:var(--bg);color:var(--fg);font:17px/1.35 -apple-system,BlinkMacSystemFont,"SF Pro Text","Segoe UI",Roboto,system-ui,sans-serif;
+  padding:env(safe-area-inset-top,0px) 0 calc(32px + env(safe-area-inset-bottom,0px));-webkit-tap-highlight-color:transparent}
+.wrap{max-width:600px;margin:0 auto;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+.num{font-variant-numeric:tabular-nums}
+button{font:inherit;color:inherit;background:none;border:0;padding:0;cursor:pointer}
+
+header{padding:14px 0 6px;display:flex;align-items:flex-end;gap:12px}
+header .t{flex:1;min-width:0}
+.over{font-size:13px;font-weight:600;letter-spacing:.02em;color:var(--muted);text-transform:uppercase}
+h1{margin:2px 0 0;font-size:34px;line-height:1.1;font-weight:700;letter-spacing:.01em}
+.refresh{width:36px;height:36px;border-radius:50%;background:var(--cell);display:grid;place-items:center;color:var(--blue);flex:none;margin-bottom:2px}
+.refresh svg{width:18px;height:18px}
+.refresh.spin svg{animation:spin .8s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+.stamp{font-size:13px;color:var(--muted);margin:0 0 18px}
+
+.tiles{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:26px}
+.tile{background:var(--cell);border-radius:14px;padding:12px 12px 13px;min-width:0}
+.tile .k{font-size:13px;color:var(--muted);font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.tile .v{font-size:30px;font-weight:700;line-height:1.15;margin-top:4px;letter-spacing:-.01em}
+.tile .v small{font-size:17px;font-weight:600;color:var(--muted)}
+.tile .s{font-size:12px;color:var(--muted);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.tile.good .v{color:var(--green)}
+
+h2{font-size:13px;font-weight:400;color:var(--muted);text-transform:uppercase;letter-spacing:.02em;margin:0 0 7px 16px}
+.group{background:var(--cell);border-radius:12px;overflow:hidden;margin-bottom:8px}
+.foot{font-size:13px;color:var(--muted);margin:0 16px 26px}
+.row{display:flex;align-items:center;gap:12px;padding:11px 16px;min-height:44px;position:relative}
+.row+.row::before{content:"";position:absolute;top:0;left:16px;right:0;border-top:.5px solid var(--sep)}
+.row .main{flex:1;min-width:0}
+.row .name{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.row .sub{font-size:13px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:1px}
+.row .end{text-align:right;flex:none}
+.row .when{font-size:13px;color:var(--muted);margin-top:3px}
+.gone .row{opacity:.55}
+
+.pill{display:inline-flex;align-items:center;gap:4px;font-size:13px;font-weight:600;padding:2px 8px;border-radius:999px}
+.pill.ok{color:var(--green);background:var(--green-soft)}
+.pill.old{color:var(--orange);background:var(--orange-soft)}
+.pill svg{width:11px;height:11px}
+
+.bar{height:8px;border-radius:4px;background:var(--track);overflow:hidden;margin-top:7px}
+.bar i{display:block;height:100%;border-radius:4px;background:var(--orange)}
+.bar i.ok{background:var(--green)}
+.vcount{font-size:17px;color:var(--muted)}
+
+.empty,.ask{background:var(--cell);border-radius:12px;padding:18px 16px;color:var(--muted);font-size:15px;margin-bottom:26px}
+.ask b{color:var(--fg);display:block;font-size:17px;margin-bottom:4px}
+.ask form{display:flex;gap:8px;margin-top:12px}
+.ask input{flex:1;min-width:0;font:inherit;font-size:16px;color:var(--fg);background:var(--bg);border:0;border-radius:10px;padding:10px 12px}
+.ask button{color:#fff;background:var(--blue);border-radius:10px;padding:10px 16px;font-weight:600}
+.err{color:var(--red)}
+.again{color:var(--blue);font-weight:600;margin-top:10px;display:inline-block}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div class="t"><div class="over">LUMEN</div><h1>Installs</h1></div>
+    <button class="refresh" id="refresh" aria-label="Refresh">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 11a8 8 0 1 0-2.3 5.7"/><path d="M20 4v7h-7"/></svg>
+    </button>
+  </header>
+  <p class="stamp num" id="stamp">Loading…</p>
+  <main id="app"></main>
+</div>
+<script>
+// Data: the counter's lumen_installs (needs the key from the link, #k=...) and the download page's version.json.
+const COUNTER = "https://samxshajnvjyarvuqfsf.supabase.co/rest/v1/rpc/lumen_installs";
+const PUBLIC_KEY = "sb_publishable_wJCyACOz0jtPh-KjUd9f5w_r8JJOr4o";
+const LATEST = "https://raw.githubusercontent.com/sfxhewitt/lumen-iptv-downloads/main/version.json";
+const DAY = 864e5;
+
+// Fire TV reports a code, not a name.
+const MODELS = {
+  AFTA: "Fire TV Cube (1st gen)", AFTR: "Fire TV Cube (2nd gen)", AFTGAZL: "Fire TV Cube (3rd gen)",
+  AFTMM: "Fire TV Stick 4K", AFTKRT: "Fire TV Stick 4K (2nd gen)", AFTKA: "Fire TV Stick 4K Max", AFTKM: "Fire TV Stick 4K Max (2nd gen)",
+  AFTSSS: "Fire TV Stick (3rd gen)", AFTSS: "Fire TV Stick Lite", AFTT: "Fire TV Stick (2nd gen)", AFTM: "Fire TV Stick (1st gen)",
+  AFTN: "Fire TV (3rd gen)", AFTS: "Fire TV (2nd gen)", AFTB: "Fire TV (1st gen)",
+  "SHIELD Android TV": "NVIDIA SHIELD",
+};
+function tvName(model, maker) {
+  model = (model || "").trim(); maker = (maker || "").trim();
+  if (MODELS[model]) return MODELS[model];
+  if (/^AFT/.test(model)) return "Fire TV (" + model + ")";
+  if (!model) return maker || "Unknown TV";
+  return maker && !model.toLowerCase().includes(maker.toLowerCase()) ? cap(maker) + " " + model : model;
+}
+function cap(s) { return s.charAt(0).toUpperCase() + s.slice(1); }
+
+function key() {
+  const m = location.hash.match(/[#&]k=([^&]+)/);
+  if (m) { try { localStorage.setItem("lumen-installs-key", decodeURIComponent(m[1])); } catch (e) {} return decodeURIComponent(m[1]); }
+  try { return localStorage.getItem("lumen-installs-key") || ""; } catch (e) { return ""; }
+}
+
+const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+const app = document.getElementById("app"), stamp = document.getElementById("stamp"), refreshBtn = document.getElementById("refresh");
+const time = d => d.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" });
+const date = d => d.toLocaleDateString("en-GB", { day: "numeric", month: "short" });
+function ago(t) {
+  const d = new Date(t), mins = Math.floor((Date.now() - d) / 6e4);
+  if (mins < 2) return "Just now";
+  if (mins < 60) return mins + " min ago";
+  const today = new Date(); today.setHours(0, 0, 0, 0);
+  if (d >= today) return "Today " + time(d);
+  if (d >= today - DAY) return "Yesterday " + time(d);
+  const days = Math.ceil((today - d) / DAY);
+  return days < 30 ? days + " days ago" : date(d);
+}
+const tick = '<svg viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2.5 6.5l2.3 2.3 4.7-5.3"/></svg>';
+
+let loading = false;
+async function load() {
+  if (loading) return;
+  const k = key();
+  if (!k) { askKey(false); return; }
+  loading = true; refreshBtn.classList.add("spin");
+  try {
+    const [rowsRes, latestRes] = await Promise.all([
+      fetch(COUNTER, { method: "POST", headers: { apikey: PUBLIC_KEY, "Content-Type": "application/json" }, body: JSON.stringify({ p_key: k }), cache: "no-store" }),
+      fetch(LATEST, { cache: "no-store" }).then(r => r.ok ? r.json() : null).catch(() => null),
+    ]);
+    if (rowsRes.status === 401 || rowsRes.status === 403) { askKey(true); return; }
+    if (!rowsRes.ok) throw new Error("The counter answered " + rowsRes.status);
+    render(await rowsRes.json(), latestRes);
+    stamp.textContent = "Updated " + time(new Date());
+  } catch (e) {
+    stamp.textContent = "Couldn't refresh";
+    if (!app.dataset.shown) app.innerHTML = `<div class="empty"><span class="err">Couldn't reach the counter.</span> ${esc(e.message || "")}<br><button class="again" onclick="load()">Try again</button></div>`;
+  } finally { loading = false; refreshBtn.classList.remove("spin"); }
+}
+
+function askKey(wrong) {
+  stamp.textContent = "";
+  app.dataset.shown = "";
+  app.innerHTML = `<div class="ask"><b>${wrong ? "That key didn't work" : "Enter the page key"}</b>Open this page from the link Claude sent, or paste the key from it.
+    <form id="kf"><input id="ki" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="Key"><button>Open</button></form></div>`;
+  document.getElementById("kf").onsubmit = ev => {
+    ev.preventDefault();
+    const v = document.getElementById("ki").value.trim();
+    if (!v) return;
+    try { localStorage.setItem("lumen-installs-key", v); } catch (e) {}
+    history.replaceState(null, "", "#k=" + encodeURIComponent(v));
+    load();
+  };
+}
+
+function render(rows, latest) {
+  const now = Date.now();
+  const seen = r => new Date(r.last_seen).getTime();
+  const top = latest && latest.versionCode ? latest.versionCode : Math.max(0, ...rows.map(r => r.version_code));
+  const topName = latest && latest.versionName ? latest.versionName : (rows.find(r => r.version_code === top) || {}).version_name || "";
+  const current = rows.filter(r => now - seen(r) < 30 * DAY), gone = rows.filter(r => now - seen(r) >= 30 * DAY);
+  const friends = current.filter(r => !r.label), yours = current.filter(r => r.label);
+  const friendsWeek = friends.filter(r => now - seen(r) < 7 * DAY).length;
+  const upToDate = current.filter(r => r.version_code >= top).length;
+  app.dataset.shown = "1";
+
+  let h = `<div class="tiles num">
+    <div class="tile"><div class="k">Friends' TVs</div><div class="v">${friends.length}</div><div class="s">${friendsWeek} this week</div></div>
+    <div class="tile${current.length && upToDate === current.length ? " good" : ""}"><div class="k">Up to date</div><div class="v">${upToDate}<small>/${current.length}</small></div><div class="s">on ${esc(topName) || "latest"}</div></div>
+    <div class="tile"><div class="k">Your TVs</div><div class="v">${yours.length}</div><div class="s">${current.length} in all</div></div>
+  </div>`;
+
+  if (!rows.length) {
+    h += `<div class="empty">No TVs yet. LUMEN counts itself once a day from the build after 1.0.303, so friends' TVs appear here after their next update.</div>`;
+    app.innerHTML = h; return;
+  }
+
+  // Versions, newest first.
+  const byVersion = {};
+  current.forEach(r => { (byVersion[r.version_code] ||= { name: r.version_name, n: 0 }).n++; });
+  const versions = Object.entries(byVersion).sort((a, b) => b[0] - a[0]);
+  if (versions.length) {
+    h += `<h2>Versions</h2><div class="group">` + versions.map(([code, v]) => {
+      const ok = +code >= top;
+      return `<div class="row"><div class="main"><div class="name">LUMEN ${esc(v.name)} ${ok ? `<span class="pill ok">${tick}Latest</span>` : ""}</div>
+        <div class="bar"><i class="${ok ? "ok" : ""}" style="width:${Math.max(4, Math.round(v.n / current.length * 100))}%"></i></div></div>
+        <div class="end vcount num">${v.n}</div></div>`;
+    }).join("") + `</div><p class="foot">TVs seen in the last 30 days. Behind ones update next time LUMEN is opened on them.</p>`;
+  }
+
+  const tvRow = r => {
+    const ok = r.version_code >= top, name = tvName(r.model, r.maker);
+    const title = r.label ? esc(r.label) : esc(name);
+    const sub = (r.label ? esc(name) + " · " : "") + "#" + esc(r.tv) + " · since " + date(new Date(r.first_seen));
+    return `<div class="row"><div class="main"><div class="name">${title}</div><div class="sub">${sub}</div></div>
+      <div class="end"><span class="pill ${ok ? "ok" : "old"} num">${ok ? tick : ""}${esc(r.version_name)}</span><div class="when num">${ago(r.last_seen)}</div></div></div>`;
+  };
+  if (current.length) h += `<h2>TVs</h2><div class="group">${current.map(tvRow).join("")}</div><p class="foot">Each TV is a random number made by LUMEN; it sends its version and model once a day. A friend can switch it off in Settings › About.</p>`;
+  if (gone.length) h += `<h2>Not seen for a month</h2><div class="group gone">${gone.map(tvRow).join("")}</div>`;
+  app.innerHTML = h;
+}
+
+refreshBtn.onclick = load;
+window.addEventListener("hashchange", load);
+document.addEventListener("visibilitychange", () => { if (!document.hidden) load(); });
+setInterval(() => { if (!document.hidden) load(); }, 60_000);
+load();
+</script>
+</body>
+</html>
