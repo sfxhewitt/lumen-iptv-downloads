@@ -1,14 +1,12 @@
 {
-  "versionCode": 303,
-  "versionName": "1.0.303",
-  "url": "https://raw.githubusercontent.com/sfxhewitt/lumen-iptv-downloads/da6cf062c49b82fffbd6c5a43b4ae064a8d8d33a/LUMEN.apk",
-  "size": 18714815,
-  "sha256": "a4f9e6162e7d0efd72bab29805f82858a7f11655085e9b1d78508968c0bfbff6",
+  "versionCode": 309,
+  "versionName": "1.0.309",
+  "url": "https://raw.githubusercontent.com/sfxhewitt/lumen-iptv-downloads/f19d146ad04a38fec4f53b564191233e705ae39f/LUMEN.apk",
+  "size": 18716303,
+  "sha256": "ec86961e88cd90e28d4c281462e97823102cd06eee77c01b42a7b00b544aeed3",
   "notes": [
-    "The guide opens at the current time",
-    "5.1 sound in Bluetooth headphones",
-    "Steadier sound on live channels",
-    "Live matches on LUMEN Home",
-    "Kids' picks for LUMEN Home"
+    "An anonymous install count",
+    "Search can't crash",
+    "Pictures for kids' channels"
   ]
 }
