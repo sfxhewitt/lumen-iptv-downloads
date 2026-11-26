@@ -1,14 +1,14 @@
 # lumen-iptv-downloads
 Public downloads of LUMEN IPTV for Android TV and Fire TV. Test builds; no provider credentials included.
 
-## Latest: LUMEN 1.0.303 beta (21 Nov 2026)
+## Latest: LUMEN 1.0.309 beta (26 Nov 2026)
 
 **Download:** https://raw.githubusercontent.com/sfxhewitt/lumen-iptv-downloads/main/LUMEN.apk
 
 This link always gets the newest build, so it never needs changing. Install it over your current LUMEN and your channels, favourites and settings are kept.
 
-- Package: com.portallive.tv, version 1.0.303
-- SHA-256: `a4f9e6162e7d0efd72bab29805f82858a7f11655085e9b1d78508968c0bfbff6`
+- Package: com.portallive.tv, version 1.0.309
+- SHA-256: `ec86961e88cd90e28d4c281462e97823102cd06eee77c01b42a7b00b544aeed3`
 - Signed with the same key as the earlier betas, so it updates in place.
 
 ### Install with the Downloader app (Fire TV / Android TV)
@@ -17,7 +17,12 @@ This link always gets the newest build, so it never needs changing. Install it o
 3. Open Downloader, type **is.gd/lumeniptv** in the box (a short link to the address above), then press Go.
 4. Choose **Install** when it asks. You can delete the downloaded file afterwards.
 
-### What's new since 1.0.245
+### What's new since 1.0.303
+- **An anonymous install count.** Once a day LUMEN sends its version and the TV's model with a random number made on the TV, so we can see how many TVs use LUMEN and whether they're up to date. Nothing about you, your provider, your channels or what you watch. Turn it off any time in Settings › About › Count this TV.
+- **Search can't crash.** When a guide listed the same programme twice on one channel, searching for it could close LUMEN. Search now leaves out the duplicate.
+- **Pictures for kids' channels.** With LUMEN Home's Kids mode on, each children's channel on now shows a picture of the programme that's on, with the channel's logo in the corner.
+
+### Also new since 1.0.245
 - **The guide opens at the current time.** The TV Guide always opens at now and keeps up with the clock until you move along it, so you never need to press Now first.
 - **5.1 sound in Bluetooth headphones.** Channels with 5.1 sound used to be silent in Bluetooth headphones. While headphones are connected, LUMEN now mixes them down to stereo. HDMI still gets Dolby as before.
 - **Steadier sound on live channels.** When a stream drops and reconnects, the sound carries on in one piece instead of blipping, and LUMEN gives a slow stream longer before reconnecting.
