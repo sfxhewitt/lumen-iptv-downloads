@@ -21,11 +21,11 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 350
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
           sparse-checkout: ufc
       - name: Phones that turned alerts on, and what's been sent
-        uses: actions/cache/restore@v4
+        uses: actions/cache/restore@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
         with:
           path: .cageside
           key: cageside-data-${{ github.run_id }}
@@ -48,7 +48,7 @@ jobs:
           CAGESIDE_SUBS: .cageside/subs.json
       - name: Keep them for the next run
         if: always() && hashFiles('.cageside/*.json') != ''
-        uses: actions/cache/save@v4
+        uses: actions/cache/save@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
         with:
           path: .cageside
           key: cageside-data-${{ github.run_id }}-${{ github.run_attempt }}
